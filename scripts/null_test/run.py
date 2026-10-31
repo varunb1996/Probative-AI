@@ -1,6 +1,7 @@
 """Phase 0c null test: raw model versus severity-only baseline on the labelled alerts.
 
     set OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_API_KEY (and ALLOW_CLOUD=true for a cloud endpoint)
+    in the shell or in .env (gitignored; copy .env.example). Shell values win over .env.
     python scripts/null_test/run.py
 
 One call per alert, temperature 0, no retries, strict parsing: this measures the raw model.
@@ -19,6 +20,7 @@ from urllib.parse import urlsplit
 import label  # same folder: reuses the labelling tool's event window
 
 DATA = Path("data")
+ENV_FILE = Path(".env")
 VERDICTS = {"benign", "suspicious", "malicious"}
 KEYS = {"verdict", "confidence", "cited_event_ids"}
 MAX_VALUE = 2000
@@ -159,6 +161,30 @@ def run_alerts(alerts: dict, events: list[dict], labels: list[tuple[str, dict]],
 
 # --- I/O --------------------------------------------------------------------
 
+def read_env(path: Path) -> dict[str, str]:
+    """KEY=VALUE lines; # comments and blank lines skipped; one pair of matching quotes stripped."""
+    if not path.exists():
+        return {}
+    values = {}
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if not sep or not key:
+            raise ValueError(f"{path} line {n}: expected KEY=VALUE")
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def apply_env(values: dict[str, str], environ) -> None:
+    for key, value in values.items():
+        environ.setdefault(key, value)
+
+
 def make_client(base_url: str, api_key: str, model: str, usage: list):
     url = base_url.rstrip("/") + "/chat/completions"
 
@@ -197,6 +223,10 @@ def print_table(rows: list[dict]) -> None:
 
 
 def main() -> None:
+    try:
+        apply_env(read_env(ENV_FILE), os.environ)
+    except ValueError as exc:
+        sys.exit(f"refused: {exc}")
     base_url = os.environ.get("OPENAI_BASE_URL", "")
     model = os.environ.get("OPENAI_MODEL", "")
     api_key = os.environ.get("OPENAI_API_KEY", "")

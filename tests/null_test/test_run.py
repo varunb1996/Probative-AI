@@ -151,6 +151,33 @@ def test_metrics_without_malicious_has_no_recall():
     assert run.metrics([{"truth": "benign", "decision": "close"}])["recall"] is None
 
 
+# --- .env -------------------------------------------------------------------
+
+def test_read_env_parses_keys_comments_blanks_and_quotes(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text('# comment\n\nOPENAI_MODEL = qwen/qwen-2.5-7b-instruct\nALLOW_CLOUD="true"\n'
+                    "OPENAI_API_KEY='sk-or-x=y'\nEMPTY=\n", encoding="utf-8")
+    assert run.read_env(path) == {"OPENAI_MODEL": "qwen/qwen-2.5-7b-instruct", "ALLOW_CLOUD": "true",
+                                  "OPENAI_API_KEY": "sk-or-x=y", "EMPTY": ""}
+
+
+def test_read_env_missing_file_is_empty(tmp_path):
+    assert run.read_env(tmp_path / ".env") == {}
+
+
+def test_read_env_rejects_a_malformed_line_with_its_number(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text("OPENAI_MODEL=x\nnot a setting\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="line 2"):
+        run.read_env(path)
+
+
+def test_apply_env_never_overrides_the_shell():
+    environ = {"OPENAI_MODEL": "from-shell"}
+    run.apply_env({"OPENAI_MODEL": "from-file", "ALLOW_CLOUD": "true"}, environ)
+    assert environ == {"OPENAI_MODEL": "from-shell", "ALLOW_CLOUD": "true"}
+
+
 # --- end to end with a fake client -------------------------------------------
 
 def _world():
