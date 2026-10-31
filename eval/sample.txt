@@ -1,0 +1,32 @@
+# seed 42; split from docs/labelling-rubric.md
+# alert_id	group
+291acda8306c7889	medium
+32a60c4fa80ff99c	medium
+3a4887cac00a4869	medium
+41f1e61b69cd3d00	medium
+7af8fafa0f3b02f5	medium
+8a8dfebceff68756	medium
+ab27deec42fac6af	medium
+aeeb5148df3ed07b	medium
+ed0ca583106c12d0	medium
+44f255f374992221	discovery
+596bfcb2255d5785	discovery
+3272105ca1ce8305	network
+07026301434ec360	network
+6c71ca4b71c80672	network
+5e5e7b31791c4752	network
+54881d84f2c83f45	network
+3846ccc12ddc25f4	proc_access_ws5
+2db5a6f88af687da	proc_access_ws5
+f975e831ffb50404	proc_access_ws5
+c69c93079157d036	proc_access_ws5
+27881e43475ab248	proc_access_ws5
+d5f41fc3bb2180d6	proc_access_ws5
+9e3de478c757bbfc	proc_access_ws5
+0e6c6f655ddb3b77	proc_access_ws5
+04a6be0a2d4206b5	proc_access_dc
+0ea0538ca5d32b15	proc_access_dc
+2aaa7ecdfd1e90cd	proc_access_dc
+760bf9479ecb02ec	proc_access_ws6
+e24ba5969287ab48	proc_access_ws6
+13a434e809806a27	proc_access_ws6
