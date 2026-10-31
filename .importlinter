@@ -1,0 +1,37 @@
+[importlinter]
+root_package = triage
+
+[importlinter:contract:domain-pure]
+name = domain imports nothing from the project
+type = forbidden
+source_modules =
+    triage.domain
+forbidden_modules =
+    triage.pipeline
+    triage.judge
+    triage.verify
+    triage.investigate
+    triage.store
+    triage.services
+    triage.api
+
+[importlinter:contract:core-no-io]
+name = pure core never touches I/O layers
+type = forbidden
+source_modules =
+    triage.pipeline
+    triage.judge
+    triage.verify
+    triage.investigate
+forbidden_modules =
+    triage.store
+    triage.services
+    triage.api
+
+[importlinter:contract:verifier-independent]
+name = verifier never imports the generator
+type = forbidden
+source_modules =
+    triage.verify
+forbidden_modules =
+    triage.judge
