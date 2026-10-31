@@ -1,0 +1,2 @@
+# Shell scripts run under bash (including the project hooks); CRLF breaks them.
+*.sh text eol=lf
