@@ -35,6 +35,36 @@ class Alert(BaseModel):
     event_ids: list[str]
 
 
+class ProcessRef(BaseModel):
+    """A process on a host. Sysmon events carry a GUID; Security events only a PID."""
+
+    model_config = ConfigDict(frozen=True)
+
+    host: str
+    pid: int
+    guid: str | None = None
+
+    def same_process(self, other: "ProcessRef") -> bool:
+        if self.host != other.host:
+            return False
+        if self.guid and other.guid:
+            return self.guid.lower() == other.guid.lower()
+        return self.pid == other.pid
+
+
+VerdictLabel = Literal["benign", "suspicious", "malicious"]
+
+
+class PriorAlert(BaseModel):
+    """An earlier alert on the same host. Its verdict is evidence only if a human confirmed it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    alert: Alert
+    verdict: VerdictLabel | None = None
+    human_confirmed: bool = False
+
+
 class IntelHit(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -52,6 +82,16 @@ class EvidenceBundle(BaseModel):
     alert: Alert
     events: list[Event]
     intel_hits: list[IntelHit] = []
+    prior_alerts: list[PriorAlert] = []
+
+
+class EvidenceScore(BaseModel):
+    """Deterministic baseline. `contributions` maps each fired signal to its weight."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total: float
+    contributions: dict[str, float]
 
 
 class Verdict(BaseModel):
@@ -64,7 +104,7 @@ class Verdict(BaseModel):
     model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
 
     alert_id: str = Field(min_length=1)
-    verdict: Literal["benign", "suspicious", "malicious"]
+    verdict: VerdictLabel
     confidence: float = Field(ge=0.0, le=1.0)
     cited_event_ids: list[str]
     summary: str

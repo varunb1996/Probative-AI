@@ -1,0 +1,66 @@
+{
+  "Timestamp": "2020-08-07 14:32:52.795 +00:00",
+  "RuleTitle": "Network Connection Initiated By PowerShell Process",
+  "Level": "low",
+  "Computer": "WORKSTATION5.theshire.local",
+  "Channel": "Sec",
+  "EventID": 5156,
+  "MitreTactics": [
+    "Exec"
+  ],
+  "MitreTags": [
+    "T1059.001"
+  ],
+  "OtherTags": [
+    "detection.threat-hunting"
+  ],
+  "RecordID": 202260,
+  "Details": {
+    "Proc": "\\device\\harddiskvolume2\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe",
+    "SrcIP": "172.18.39.5",
+    "SrcPort": 65385,
+    "TgtIP": "10.10.10.5",
+    "TgtPort": 80,
+    "Protocol": 6,
+    "TgtMachineID": "S-1-0-0",
+    "TgtSID": "S-1-0-0",
+    "PID": "n/a"
+  },
+  "ExtraFieldInfo": {
+    "@timestamp": "2020-08-07T14:32:52.795Z",
+    "@version": 1,
+    "Category": "Filtering Platform Connection",
+    "Channel": "Security",
+    "Direction": "%%14593",
+    "EventID": 5156,
+    "EventReceivedTime": "2020-08-07 10:32:52",
+    "EventTime": "2020-08-07 10:32:51",
+    "EventType": "AUDIT_SUCCESS",
+    "ExecutionProcessID": 4,
+    "FilterRTID": 69420,
+    "Hostname": "WORKSTATION5.theshire.local",
+    "Keywords": -9214364837600034816,
+    "LayerName": "%%14611",
+    "LayerRTID": 48,
+    "Message": "The Windows Filtering Platform has permitted a connection.\r\n\r\nApplication Information:\r\n\tProcess ID:\t\t1648\r\n\tApplication Name:\t\\device\\harddiskvolume2\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe\r\n\r\nNetwork Information:\r\n\tDirection:\t\tOutbound\r\n\tSource Address:\t\t172.18.39.5\r\n\tSource Port:\t\t65385\r\n\tDestination Address:\t10.10.10.5\r\n\tDestination Port:\t\t80\r\n\tProtocol:\t\t6\r\n\r\nFilter Information:\r\n\tFilter Run-Time ID:\t69420\r\n\tLayer Name:\t\tConnect\r\n\tLayer Run-Time ID:\t48",
+    "Opcode": "Info",
+    "OpcodeValue": 0,
+    "ProcessId": 1648,
+    "ProviderGuid": "{54849625-5478-4994-A5BA-3E3B0328C30D}",
+    "RecordNumber": 202260,
+    "Severity": "INFO",
+    "SeverityValue": 2,
+    "SourceModuleName": "eventlog",
+    "SourceModuleType": "im_msvistalog",
+    "SourceName": "Microsoft-Windows-Security-Auditing",
+    "Task": 12810,
+    "ThreadID": 2532,
+    "Version": 1,
+    "host": "wec.internal.cloudapp.net",
+    "port": 60122,
+    "tags[1]": "mordorDataset"
+  },
+  "RuleFile": "net_connection_win_powershell_network_connection.yml",
+  "RuleID": "9e00ae65-e5aa-2c89-c7a1-7b6ee0e194f5",
+  "EvtxFile": "data\\raw\\empire_mimikatz_logonpasswords_2020-08-07103224.json"
+}

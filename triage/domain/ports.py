@@ -3,23 +3,23 @@
 from datetime import datetime
 from typing import Protocol
 
-from triage.domain.models import Event, IntelHit
+from triage.domain.models import Event, IntelHit, ProcessRef
 
 
 class EventSource(Protocol):
-    def process_events(self, host: str, process_guid: str) -> list[Event]:
+    def process_events(self, process: ProcessRef) -> list[Event]:
         """Events emitted by this process."""
         ...
 
-    def parent_events(self, host: str, process_guid: str) -> list[Event]:
+    def parent_events(self, process: ProcessRef) -> list[Event]:
         """Events emitted by this process's parent."""
         ...
 
-    def child_events(self, host: str, process_guid: str) -> list[Event]:
+    def child_events(self, process: ProcessRef) -> list[Event]:
         """Events emitted by this process's children."""
         ...
 
-    def network_events(self, host: str, process_guid: str) -> list[Event]:
+    def network_events(self, process: ProcessRef) -> list[Event]:
         """Network events attributed to this process."""
         ...
 

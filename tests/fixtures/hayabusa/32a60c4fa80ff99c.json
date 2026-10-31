@@ -1,0 +1,68 @@
+{
+  "Timestamp": "2020-08-07 14:32:57.589 +00:00",
+  "RuleTitle": "Potential Credential Dumping Attempt Via PowerShell",
+  "Level": "med",
+  "Computer": "WORKSTATION5.theshire.local",
+  "Channel": "Sysmon",
+  "EventID": 10,
+  "MitreTactics": [
+    "CredAccess"
+  ],
+  "MitreTags": [
+    "T1003.001"
+  ],
+  "OtherTags": [
+    "detection.threat-hunting",
+    "sysmon"
+  ],
+  "RecordID": 725757,
+  "Details": {
+    "SrcProc": "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "TgtProc": "C:\\windows\\system32\\lsass.exe",
+    "SrcUser": "n/a",
+    "TgtUser": "n/a",
+    "Access": "0x1010",
+    "SrcPID": 1648,
+    "SrcPGUID": "{297bc33e-65d0-5f2d-8207-000000000400}",
+    "TgtPID": 768,
+    "TgtPGUID": "{297bc33e-5c2e-5f2b-0c00-000000000400}"
+  },
+  "ExtraFieldInfo": {
+    "@timestamp": "2020-08-07T14:32:57.589Z",
+    "@version": 1,
+    "AccountName": "SYSTEM",
+    "AccountType": "User",
+    "CallTrace": "C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|UNKNOWN(000002EE319439BF)",
+    "Channel": "Microsoft-Windows-Sysmon/Operational",
+    "Domain": "NT AUTHORITY",
+    "EventID": 10,
+    "EventReceivedTime": "2020-08-07 10:32:57",
+    "EventTime": "2020-08-07 10:32:56",
+    "EventType": "INFO",
+    "ExecutionProcessID": 3284,
+    "Hostname": "WORKSTATION5.theshire.local",
+    "Keywords": -9223372036854775808,
+    "Message": "Process accessed:\r\nRuleName: -\r\nUtcTime: 2020-08-07 14:32:56.540\r\nSourceProcessGUID: {297bc33e-65d0-5f2d-8207-000000000400}\r\nSourceProcessId: 1648\r\nSourceThreadId: 7324\r\nSourceImage: C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nTargetProcessGUID: {297bc33e-5c2e-5f2b-0c00-000000000400}\r\nTargetProcessId: 768\r\nTargetImage: C:\\windows\\system32\\lsass.exe\r\nGrantedAccess: 0x1010\r\nCallTrace: C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|UNKNOWN(000002EE319439BF)",
+    "OpcodeValue": 0,
+    "ProviderGuid": "{5770385F-C22A-43E0-BF4C-06F5698FFBD9}",
+    "RecordNumber": 725757,
+    "RuleName": "-",
+    "Severity": "INFO",
+    "SeverityValue": 2,
+    "SourceModuleName": "eventlog",
+    "SourceModuleType": "im_msvistalog",
+    "SourceName": "Microsoft-Windows-Sysmon",
+    "SourceThreadId": 7324,
+    "Task": 10,
+    "ThreadID": 4364,
+    "UserID": "S-1-5-18",
+    "UtcTime": "2020-08-07 14:32:56.540",
+    "Version": 3,
+    "host": "wec.internal.cloudapp.net",
+    "port": 60122,
+    "tags[1]": "mordorDataset"
+  },
+  "RuleFile": "proc_access_win_lsass_powershell_access.yml",
+  "RuleID": "05592793-60ba-a781-f058-0218e4f38976",
+  "EvtxFile": "data\\raw\\empire_mimikatz_logonpasswords_2020-08-07103224.json"
+}
