@@ -74,4 +74,4 @@ docker compose up                 # full system (from Phase 4)
 ## Current phase
 
 <!-- Update by hand at the start of each phase. -->
-Phase: 0
+Phase: 1
