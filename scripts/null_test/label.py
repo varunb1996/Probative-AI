@@ -1,7 +1,8 @@
 """Phase 0b labelling tool. The human labels; this script only shows evidence and records answers.
 
-    python scripts/null_test/label.py sample    # draw the 30-alert sample into eval/sample.txt
-    python scripts/null_test/label.py label     # label the sample into eval/labels/labels.jsonl
+    python scripts/null_test/label.py sample     # draw the 30-alert sample into eval/sample.txt
+    python scripts/null_test/label.py label      # label the sample into eval/labels/labels.jsonl
+    python scripts/null_test/label.py spotcheck  # label 6 unsampled alerts from scratch into eval/labels/spotcheck.jsonl
 
 Sample split and attacker facts come from docs/labelling-rubric.md. Throwaway script, no model calls.
 """
@@ -17,7 +18,9 @@ from pathlib import Path
 DATA = Path("data")
 SAMPLE = Path("eval/sample.txt")
 LABELS = Path("eval/labels/labels.jsonl")
+SPOTCHECK = Path("eval/labels/spotcheck.jsonl")
 SEED = 42
+SPOTCHECK_SEED = 7
 NEIGHBOURS = 20
 
 # From docs/labelling-rubric.md, "What the scenario tells me". Used only to highlight, never to label.
@@ -39,6 +42,10 @@ GROUPS = [
     ("proc_access_dc", lambda a: a["rule_title"] == "Proc Access" and _short_host(a) == "MORDORDC", 3),
     ("proc_access_ws6", lambda a: a["rule_title"] == "Proc Access" and _short_host(a) == "WORKSTATION6", 3),
 ]
+
+# Spot check: 6 alerts outside the sample. The sample already holds every medium and
+# discovery alert, so only these groups have alerts left; weighted toward Proc Access.
+SPOTCHECK_SPLIT = {"network": 1, "proc_access_ws5": 3, "proc_access_dc": 1, "proc_access_ws6": 1}
 
 
 # --- pure helpers (tested) --------------------------------------------------
@@ -70,6 +77,21 @@ def draw_sample(alerts: list[dict], seed: int = SEED) -> list[tuple[str, str]]:
         picks = candidates if count is None or count >= len(candidates) else rng.sample(candidates, count)
         sample += [(a["alert_id"], group) for a in picks]
     return sample
+
+
+def draw_spotcheck(alerts: list[dict], exclude: set[str], seed: int = SPOTCHECK_SEED) -> list[tuple[str, str]]:
+    """Pick the spot-check alerts, never one in `exclude` (the labelled sample)."""
+    rng = random.Random(seed)
+    ordered = sorted((a for a in alerts if a["alert_id"] not in exclude), key=lambda a: a["alert_id"])
+    picks = []
+    for group, matches, _ in GROUPS:
+        count = SPOTCHECK_SPLIT.get(group, 0)
+        if not count:
+            continue
+        candidates = [a for a in ordered if matches(a)]
+        chosen = candidates if count >= len(candidates) else rng.sample(candidates, count)
+        picks += [(a["alert_id"], group) for a in chosen]
+    return picks
 
 
 def write_sample(path: Path, sample: list[tuple[str, str]], seed: int) -> None:
@@ -124,6 +146,24 @@ def append_label(path: Path, row: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def summarise(rows: list[dict], sample_ids: list[str]) -> str:
+    """Progress line. Assisted labels have no seconds; averages use only timed rows."""
+    wanted = set(sample_ids)
+    rows = [r for r in rows if r["alert_id"] in wanted]
+    timed = [r["seconds"] for r in rows if isinstance(r.get("seconds"), (int, float))]
+    untimed = len(rows) - len(timed)
+    if timed:
+        timing = f"avg {sum(timed) / len(timed):.1f}s per label over {len(timed)} timed"
+        if untimed:
+            timing += f", {untimed} not recorded (assisted labels)"
+    elif untimed:
+        timing = "time per label: not recorded (assisted labels)"
+    else:
+        timing = "time per label: -"
+    unsure = sum(1 for r in rows if r["rationale"].upper().startswith("UNSURE:"))
+    return f"labelled {len(rows)}/{len(sample_ids)}  {timing}  unsure {unsure}"
 
 
 # --- display ----------------------------------------------------------------
@@ -200,10 +240,7 @@ def report(labels_path: Path, sample_ids: list[str]) -> None:
     if labels_path.exists():
         with labels_path.open(encoding="utf-8") as f:
             rows = [json.loads(line) for line in f if line.strip()]
-    rows = [r for r in rows if r["alert_id"] in set(sample_ids)]
-    avg = sum(r["seconds"] for r in rows) / len(rows) if rows else 0.0
-    unsure = sum(1 for r in rows if r["rationale"].upper().startswith("UNSURE:"))
-    print(f"\nlabelled {len(rows)}/{len(sample_ids)}  avg {avg:.1f}s per label  unsure {unsure}")
+    print("\n" + summarise(rows, sample_ids))
 
 
 # --- commands ---------------------------------------------------------------
@@ -232,7 +269,18 @@ def ask(prompt: str, valid=None) -> str:
 
 
 def cmd_label(args) -> None:
-    sample = read_sample(args.sample)
+    run_labelling(args, read_sample(args.sample))
+
+
+def cmd_spotcheck(args) -> None:
+    sampled = {alert_id for alert_id, _ in read_sample(args.sample)}
+    spot = draw_spotcheck(read_jsonl(args.data / "alerts.jsonl"), exclude=sampled)
+    print(f"spot check: {len(spot)} alerts outside the sample, labelled from scratch")
+    run_labelling(args, spot)
+
+
+def run_labelling(args, sample: list[tuple[str, str]]) -> None:
+    """Walk `sample`, show evidence, record answers. Reads labels only to skip done alert IDs."""
     groups = dict(sample)
     sample_ids = [alert_id for alert_id, _ in sample]
     alerts = {a["alert_id"]: a for a in read_jsonl(args.data / "alerts.jsonl")}
@@ -279,6 +327,9 @@ def main() -> None:
     lab = sub.add_parser("label", help="label the sample")
     lab.add_argument("--labels", type=Path, default=LABELS)
     lab.set_defaults(func=cmd_label)
+    spot = sub.add_parser("spotcheck", help="label 6 unsampled alerts from scratch (human baseline)")
+    spot.add_argument("--labels", type=Path, default=SPOTCHECK)
+    spot.set_defaults(func=cmd_spotcheck)
     args = p.parse_args()
     args.func(args)
 

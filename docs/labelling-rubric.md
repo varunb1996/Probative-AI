@@ -72,3 +72,4 @@ Random picks use a fixed seed (42) so the sample can be reproduced. The sampling
 ## Change log
 
 - 2026-10-31: Rubric written. Filled in the attacker process (PID 1648 / 0x670, ProcessGuid). Step 1 now matches decimal or hex PID. Step 2 names both destination fields (DestinationIp, DestAddress). Step 3 covers any memory-read mask, including 0x10. Step 5 names the DC "Raw Access Read" alerts. Sample split made concrete (9 medium, 2 discovery, 5 network, 14 process access), weighted toward Proc Access, where judgment is needed.
+- 2026-10-31: 30 sample labels proposed by Claude and reviewed by Varun (labeller field records this). Human baseline comes from a 6-alert from-scratch spot check instead. Phase 0c must use a non-Claude model.

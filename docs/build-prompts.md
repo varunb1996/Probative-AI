@@ -60,9 +60,25 @@ and a one-line rationale. It appends to eval/labels/labels.jsonl. You cannot wri
 eval/labels yourself; the tool writes there when I run it. Resumable: skip alert_ids already labelled.
 ```
 
-Before labelling, write your own rubric in `docs/labelling-rubric.md`: what makes an alert malicious in this scenario. After labelling 30, run `chmod -R a-w eval/labels` and commit.
+Before labelling, write your own rubric in `docs/labelling-rubric.md`: what makes an alert malicious in this scenario.
 
-Gate: 30 labelled alerts, rubric written, time per label noted.
+Decision (2026-10-31, logged in the rubric's change log): the 30 sample labels are assisted labels,
+proposed by Claude and reviewed by you. Each row's `labeller` field says so, and `seconds` and
+`labelled_at` are null. Because review time is not labelling time, the human baseline comes from
+a from-scratch spot check instead:
+
+```
+python scripts/null_test/label.py sample      # 30-alert sample (seed 42) into eval/sample.txt
+python scripts/null_test/label.py spotcheck   # 6 alerts NOT in the sample (seed 7), labelled by you
+                                              # with timing, into eval/labels/spotcheck.jsonl
+```
+
+You install the assisted labels into `eval/labels/labels.jsonl` by hand; Claude cannot write there.
+After the spot check, run `chmod -R a-w eval/labels` (Windows: `attrib +R` on each file) and commit.
+Because a Claude model proposed the labels, Phase 0c must measure a non-Claude model.
+
+Gate: 30 assisted labels installed, rubric written (with the decision logged), 6 spot-check labels
+with time per label noted.
 
 ### 0c. Null-test runner
 

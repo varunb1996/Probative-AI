@@ -135,3 +135,60 @@ def test_append_then_resume_skips_done_alerts(tmp_path):
     assert label.pending(["a1", "a2", "a3", "a4"], label.labelled_ids(path)) == ["a3", "a4"]
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [r["alert_id"] for r in rows] == ["a2", "a1"]
+
+
+# --- summary ----------------------------------------------------------------
+
+def _row(alert_id, seconds, rationale="step 1"):
+    return {"alert_id": alert_id, "label": "malicious", "rationale": rationale,
+            "seconds": seconds, "labelled_at": None}
+
+
+def test_summary_with_only_assisted_rows_does_not_crash():
+    rows = [_row("a1", None), _row("a2", None, "UNSURE: thin evidence")]
+    text = label.summarise(rows, ["a1", "a2", "a3"])
+    assert "labelled 2/3" in text
+    assert "time per label: not recorded (assisted labels)" in text
+    assert "unsure 1" in text
+
+
+def test_summary_averages_only_rows_with_seconds():
+    rows = [_row("a1", 4.0), _row("a2", 8.0), _row("a3", None)]
+    text = label.summarise(rows, ["a1", "a2", "a3"])
+    assert "avg 6.0s per label over 2 timed" in text
+    assert "1 not recorded (assisted labels)" in text
+
+
+def test_summary_treats_a_missing_seconds_key_as_not_recorded():
+    rows = [{"alert_id": "a1", "label": "benign", "rationale": "step 4"}]
+    assert "not recorded (assisted labels)" in label.summarise(rows, ["a1"])
+
+
+def test_summary_ignores_rows_outside_the_sample():
+    text = label.summarise([_row("a1", 2.0), _row("zz", 100.0)], ["a1"])
+    assert "labelled 1/1" in text and "avg 2.0s" in text
+
+
+# --- spot check -------------------------------------------------------------
+
+def test_spotcheck_draws_six_unsampled_alerts_across_groups():
+    alerts = _dataset()
+    sampled = {alert_id for alert_id, _ in label.draw_sample(alerts, seed=42)}
+    spot = label.draw_spotcheck(alerts, exclude=sampled)
+    assert len(spot) == 6
+    assert not {alert_id for alert_id, _ in spot} & sampled
+    assert Counter(group for _, group in spot) == label.SPOTCHECK_SPLIT
+
+
+def test_spotcheck_is_reproducible_with_seed_seven():
+    alerts = _dataset()
+    sampled = {alert_id for alert_id, _ in label.draw_sample(alerts, seed=42)}
+    assert label.draw_spotcheck(alerts, exclude=sampled) == label.draw_spotcheck(alerts, exclude=sampled, seed=7)
+    assert label.draw_spotcheck(alerts, exclude=sampled) != label.draw_spotcheck(alerts, exclude=sampled, seed=8)
+
+
+def test_spotcheck_takes_what_is_left_when_a_group_is_short():
+    alerts = _dataset()
+    exclude = {a["alert_id"] for a in alerts if a["host"].startswith("MORDORDC")}
+    groups = Counter(group for _, group in label.draw_spotcheck(alerts, exclude=exclude))
+    assert groups["proc_access_dc"] == 0
