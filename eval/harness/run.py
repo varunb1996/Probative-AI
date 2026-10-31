@@ -7,6 +7,7 @@ import os
 import re
 import time
 from collections import Counter
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -58,9 +59,27 @@ def load_env(path: Path = ENV_FILE) -> None:
             os.environ.setdefault(key.strip(), value.strip())
 
 
-def run(model: str | None, base_url: str | None, pause: float) -> Path:
+def provider_env(env: Mapping[str, str], provider: str | None) -> dict[str, str]:
+    """With a provider, map NAME_BASE_URL/MODEL/API_KEY (and optional NAME_ALLOW_CLOUD,
+    NAME_STRUCTURED_OUTPUT) onto the OPENAI_* settings the client reads."""
+    out = dict(env)
+    if provider is None:
+        return out
+    prefix = provider.upper() + "_"
+    missing = [prefix + k for k in ("BASE_URL", "MODEL") if not env.get(prefix + k)]
+    if missing:
+        raise ValueError(f"provider {provider!r} is not configured in .env: missing {', '.join(missing)}")
+    for key in ("BASE_URL", "MODEL", "API_KEY"):
+        out["OPENAI_" + key] = env.get(prefix + key, "")
+    for flag in ("ALLOW_CLOUD", "STRUCTURED_OUTPUT"):
+        if prefix + flag in env:
+            out[flag] = env[prefix + flag]
+    return out
+
+
+def run(model: str | None, base_url: str | None, pause: float, provider: str | None = None) -> Path:
     load_env()
-    env = dict(os.environ)
+    env = provider_env(os.environ, provider)
     if model:
         env["OPENAI_MODEL"] = model
     if base_url:

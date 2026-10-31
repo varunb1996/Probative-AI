@@ -98,6 +98,7 @@ def main() -> None:
     b.add_argument("--allowlist", type=Path)
     b.add_argument("--dedup-minutes", type=float, default=5)
     r = sub.add_parser("run", help="full pipeline with the judge; writes eval/reports/<timestamp>.md")
+    r.add_argument("--provider", help="use NAME_BASE_URL, NAME_MODEL, NAME_API_KEY from .env (e.g. groq)")
     r.add_argument("--model", help="overrides OPENAI_MODEL")
     r.add_argument("--base-url", help="overrides OPENAI_BASE_URL")
     r.add_argument("--pause", type=float, default=3, help="seconds between model calls")
@@ -105,7 +106,7 @@ def main() -> None:
     if args.command == "baseline":
         baseline(args.allowlist, timedelta(minutes=args.dedup_minutes))
     else:
-        print(f"report: {run(args.model, args.base_url, args.pause)}")
+        print(f"report: {run(args.model, args.base_url, args.pause, args.provider)}")
 
 
 if __name__ == "__main__":
