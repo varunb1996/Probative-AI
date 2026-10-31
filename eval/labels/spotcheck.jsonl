@@ -1,0 +1,6 @@
+{"alert_id": "9d6f67d4b8d8cf91", "label": "malicious", "rationale": "attacker=1648(0x670)=attacker process", "seconds": 1921.9, "labelled_at": "2026-10-31T08:15:57+00:00"}
+{"alert_id": "3cf6a608403d1c9c", "label": "benign", "rationale": "step:svchost process accessed, routine", "seconds": 210.7, "labelled_at": "2026-10-31T08:19:28+00:00"}
+{"alert_id": "985211e48cc2f591", "label": "malicious", "rationale": "UNSURE: cannot see the details", "seconds": 142.8, "labelled_at": "2026-10-31T08:21:51+00:00"}
+{"alert_id": "f9cfc9e03ece9ecd", "label": "malicious", "rationale": "step 1: powershell.exe pid = 1648 (0x670) = attacker process", "seconds": 168.3, "labelled_at": "2026-10-31T08:24:39+00:00"}
+{"alert_id": "21d540a5456f44e9", "label": "benign", "rationale": "step 4: svchost image loaded, routine", "seconds": 143.4, "labelled_at": "2026-10-31T08:27:03+00:00"}
+{"alert_id": "2ffff93b9707f96b", "label": "benign", "rationale": "step 4: svchost process accessed, routine", "seconds": 97.7, "labelled_at": "2026-10-31T08:28:40+00:00"}
