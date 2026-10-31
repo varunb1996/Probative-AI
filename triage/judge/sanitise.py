@@ -6,7 +6,7 @@ from typing import Any
 from triage.domain import Event, EvidenceBundle
 
 MAX_VALUE = 2000
-MAX_NEIGHBOURS = 40
+MAX_NEIGHBOURS = 10   # keeps a prompt around 4k tokens, inside free-tier per-minute caps
 # Message repeats the other fields as prose; the rest is collector boilerplate.
 DROP_FIELDS = {"Message", "tags", "@version", "Keywords", "host", "port",
                "SourceModuleName", "SourceModuleType", "EventReceivedTime"}

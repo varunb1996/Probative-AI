@@ -46,7 +46,8 @@ class InferenceConfig(BaseModel):
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "InferenceConfig":
         return cls(base_url=env["OPENAI_BASE_URL"], model=env["OPENAI_MODEL"],
                    api_key=env.get("OPENAI_API_KEY", ""),
-                   allow_cloud=env.get("ALLOW_CLOUD", "").strip().lower() == "true")
+                   allow_cloud=env.get("ALLOW_CLOUD", "").strip().lower() == "true",
+                   structured_output=env.get("STRUCTURED_OUTPUT", "true").strip().lower() != "false")
 
 
 @dataclass(frozen=True)
