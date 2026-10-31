@@ -1,42 +1,27 @@
 """python -m eval.harness baseline [--allowlist FILE] [--dedup-minutes N]
+python -m eval.harness run [--model M] [--base-url U] [--pause S]
 
-Scores the deterministic baseline (evidence score) and the severity-only baseline over the
-low+ alerts, and reports them on the labelled subset. Reads labels read-only.
+baseline: the evidence score and severity-only baseline over the low+ alerts, reported on the
+assisted labels. run: the full pipeline with the judge, written to eval/reports/. Labels are read only.
 """
 
 import argparse
-import json
 from collections import Counter, defaultdict
 from datetime import timedelta
 from pathlib import Path
 
-from eval.harness.jsonl_source import JsonlEventSource, NoIntel
+from eval.harness.dataset import load_labels, load_pairs
+from eval.harness.jsonl_source import NoIntel
+from eval.harness.run import run
 from triage.pipeline.context import build_bundle
 from triage.pipeline.enrich import enrich
 from triage.pipeline.noise import dedup, is_allowlisted, load_allowlist
-from triage.pipeline.parse import parse_alert
 from triage.pipeline.score import CLOSE_BELOW, score
-
-LABELS = Path("eval") / "labels" / "labels.jsonl"
-DATA = Path("data")
-
-
-def _read_jsonl(path: Path) -> list[dict]:
-    with path.open(encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
 
 
 def baseline(allowlist: Path | None, dedup_window: timedelta) -> None:
-    source = JsonlEventSource(DATA / "events.jsonl")
-    by_key = {(e.host, e.fields["RecordNumber"], e.fields["EventID"]): e for e in source.events}
+    source, pairs = load_pairs()
     rules = load_allowlist(allowlist) if allowlist else []
-
-    pairs = []
-    for record in _read_jsonl(DATA / "alerts_raw.jsonl"):
-        if record["Level"] == "info":
-            continue
-        trigger = by_key[(record["Computer"], record["RecordID"], record["EventID"])]
-        pairs.append((parse_alert(record, trigger), trigger))
 
     heads = dedup(pairs, dedup_window)
     rows = {}
@@ -52,7 +37,7 @@ def baseline(allowlist: Path | None, dedup_window: timedelta) -> None:
     for dup, head in heads.items():  # a duplicate keeps its own score but takes its head's disposition
         rows[dup].update(closed=rows[head]["closed"], head=head)
 
-    labels = {row["alert_id"]: row["label"] for row in _read_jsonl(LABELS)}
+    labels = {a: label for a, (label, _) in load_labels(include_spotcheck=False).items()}
     missing = sorted(set(labels) - set(rows))
     if missing:
         raise SystemExit(f"labelled alerts not produced by the pipeline: {missing}")
@@ -112,8 +97,15 @@ def main() -> None:
     b = sub.add_parser("baseline", help="score the deterministic baselines over the labels")
     b.add_argument("--allowlist", type=Path)
     b.add_argument("--dedup-minutes", type=float, default=5)
+    r = sub.add_parser("run", help="full pipeline with the judge; writes eval/reports/<timestamp>.md")
+    r.add_argument("--model", help="overrides OPENAI_MODEL")
+    r.add_argument("--base-url", help="overrides OPENAI_BASE_URL")
+    r.add_argument("--pause", type=float, default=3, help="seconds between model calls")
     args = p.parse_args()
-    baseline(args.allowlist, timedelta(minutes=args.dedup_minutes))
+    if args.command == "baseline":
+        baseline(args.allowlist, timedelta(minutes=args.dedup_minutes))
+    else:
+        print(f"report: {run(args.model, args.base_url, args.pause)}")
 
 
 if __name__ == "__main__":

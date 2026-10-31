@@ -28,6 +28,10 @@ class InferenceError(Exception):
     """The endpoint could not be reached or returned no usable completion."""
 
 
+class RateLimited(InferenceError):
+    """HTTP 429. A caller may wait and resend; this is not a retry on invalid output."""
+
+
 class InferenceConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -89,7 +93,8 @@ class OpenAICompatibleClient:
             with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
                 payload = json.loads(response.read())
         except urllib.error.HTTPError as e:
-            raise InferenceError(f"HTTP {e.code}: {e.read()[:300].decode(errors='replace')}") from e
+            error = RateLimited if e.code == 429 else InferenceError
+            raise error(f"HTTP {e.code}: {e.read()[:300].decode(errors='replace')}") from e
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             raise InferenceError(str(e)) from e
         try:
