@@ -1,0 +1,70 @@
+{
+  "alert": {
+    "alert_id": "32a60c4fa80ff99c",
+    "rule_title": "Potential Credential Dumping Attempt Via PowerShell",
+    "rule_level": "medium",
+    "mitre_tags": [
+      "T1003.001"
+    ],
+    "host": "WORKSTATION5.theshire.local",
+    "user": "NT AUTHORITY\\SYSTEM",
+    "timestamp": "2020-08-07T14:32:57.589000+00:00",
+    "event_ids": [
+      "Microsoft-Windows-Sysmon/Operational:725757"
+    ]
+  },
+  "event": {
+    "event_id": "Microsoft-Windows-Sysmon/Operational:725757",
+    "tags": [
+      "mordorDataset"
+    ],
+    "TargetProcessGUID": "{297bc33e-5c2e-5f2b-0c00-000000000400}",
+    "@version": "1",
+    "EventType": "INFO",
+    "Version": 3,
+    "ThreadID": 4364,
+    "EventTime": "2020-08-07 10:32:56",
+    "Task": 10,
+    "AccountType": "User",
+    "SourceProcessGUID": "{297bc33e-65d0-5f2d-8207-000000000400}",
+    "CallTrace": "C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|UNKNOWN(000002EE319439BF)",
+    "Channel": "Microsoft-Windows-Sysmon/Operational",
+    "SourceName": "Microsoft-Windows-Sysmon",
+    "OpcodeValue": 0,
+    "Hostname": "WORKSTATION5.theshire.local",
+    "@timestamp": "2020-08-07T14:32:57.589Z",
+    "Message": "Process accessed:\r\nRuleName: -\r\nUtcTime: 2020-08-07 14:32:56.540\r\nSourceProcessGUID: {297bc33e-65d0-5f2d-8207-000000000400}\r\nSourceProcessId: 1648\r\nSourceThreadId: 7324\r\nSourceImage: C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nTargetProcessGUID: {297bc33e-5c2e-5f2b-0c00-000000000400}\r\nTargetProcessId: 768\r\nTargetImage: C:\\windows\\system32\\lsass.exe\r\nGrantedAccess: 0x1010\r\nCallTrace: C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|UNKNOWN(000002EE319439BF)",
+    "SourceModuleName": "eventlog",
+    "ProcessId": "1648",
+    "SourceImage": "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "EventReceivedTime": "2020-08-07 10:32:57",
+    "port": 60122,
+    "AccountName": "SYSTEM",
+    "UtcTime": "2020-08-07 14:32:56.540",
+    "GrantedAccess": "0x1010",
+    "Domain": "NT AUTHORITY",
+    "ExecutionProcessID": 3284,
+    "host": "wec.internal.cloudapp.net",
+    "SourceProcessId": "1648",
+    "SourceThreadId": "7324",
+    "Severity": "INFO",
+    "TargetProcessId": "768",
+    "SeverityValue": 2,
+    "EventID": 10,
+    "UserID": "S-1-5-18",
+    "ProviderGuid": "{5770385F-C22A-43E0-BF4C-06F5698FFBD9}",
+    "RecordNumber": 725757,
+    "SourceModuleType": "im_msvistalog",
+    "Keywords": -9223372036854775808,
+    "TargetImage": "C:\\windows\\system32\\lsass.exe",
+    "RuleName": "-"
+  },
+  "label": {
+    "alert_id": "32a60c4fa80ff99c",
+    "label": "malicious",
+    "rationale": "step 1: SourceProcessGUID = attacker GUID; PID 1648 opens lsass with 0x1010 (the credential dump)",
+    "seconds": null,
+    "labelled_at": null,
+    "labeller": "claude-proposed, varun-reviewed"
+  }
+}

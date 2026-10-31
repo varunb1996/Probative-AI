@@ -1,0 +1,68 @@
+{
+  "alert": {
+    "alert_id": "27881e43475ab248",
+    "rule_title": "Proc Access",
+    "rule_level": "low",
+    "mitre_tags": [],
+    "host": "WORKSTATION5.theshire.local",
+    "user": "NT AUTHORITY\\SYSTEM",
+    "timestamp": "2020-08-07T14:33:01.248000+00:00",
+    "event_ids": [
+      "Microsoft-Windows-Sysmon/Operational:725771"
+    ]
+  },
+  "event": {
+    "event_id": "Microsoft-Windows-Sysmon/Operational:725771",
+    "tags": [
+      "mordorDataset"
+    ],
+    "TargetProcessGUID": "{297bc33e-5c35-5f2b-4700-000000000400}",
+    "@version": "1",
+    "EventType": "INFO",
+    "Version": 3,
+    "ThreadID": 4364,
+    "EventTime": "2020-08-07 10:33:00",
+    "Task": 10,
+    "AccountType": "User",
+    "SourceProcessGUID": "{297bc33e-5c2f-5f2b-1200-000000000400}",
+    "CallTrace": "C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+6a7f5|c:\\windows\\system32\\lsm.dll+111b6|C:\\windows\\System32\\RPCRT4.dll+76953|C:\\windows\\System32\\RPCRT4.dll+da036|C:\\windows\\System32\\RPCRT4.dll+37a4c|C:\\windows\\System32\\RPCRT4.dll+548c8|C:\\windows\\System32\\RPCRT4.dll+2c921|C:\\windows\\System32\\RPCRT4.dll+2c1db|C:\\windows\\System32\\RPCRT4.dll+1a86f|C:\\windows\\System32\\RPCRT4.dll+19d1a|C:\\windows\\System32\\RPCRT4.dll+19301|C:\\windows\\System32\\RPCRT4.dll+18d6e|C:\\windows\\System32\\RPCRT4.dll+169a5|C:\\windows\\SYSTEM32\\ntdll.dll+333ed|C:\\windows\\SYSTEM32\\ntdll.dll+34142|C:\\windows\\System32\\KERNEL32.DLL+17bd4|C:\\windows\\SYSTEM32\\ntdll.dll+6ce51",
+    "Channel": "Microsoft-Windows-Sysmon/Operational",
+    "SourceName": "Microsoft-Windows-Sysmon",
+    "OpcodeValue": 0,
+    "Hostname": "WORKSTATION5.theshire.local",
+    "@timestamp": "2020-08-07T14:33:01.248Z",
+    "Message": "Process accessed:\r\nRuleName: -\r\nUtcTime: 2020-08-07 14:33:00.025\r\nSourceProcessGUID: {297bc33e-5c2f-5f2b-1200-000000000400}\r\nSourceProcessId: 452\r\nSourceThreadId: 2732\r\nSourceImage: C:\\windows\\system32\\svchost.exe\r\nTargetProcessGUID: {297bc33e-5c35-5f2b-4700-000000000400}\r\nTargetProcessId: 3140\r\nTargetImage: C:\\windows\\System32\\svchost.exe\r\nGrantedAccess: 0x1000\r\nCallTrace: C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+6a7f5|c:\\windows\\system32\\lsm.dll+111b6|C:\\windows\\System32\\RPCRT4.dll+76953|C:\\windows\\System32\\RPCRT4.dll+da036|C:\\windows\\System32\\RPCRT4.dll+37a4c|C:\\windows\\System32\\RPCRT4.dll+548c8|C:\\windows\\System32\\RPCRT4.dll+2c921|C:\\windows\\System32\\RPCRT4.dll+2c1db|C:\\windows\\System32\\RPCRT4.dll+1a86f|C:\\windows\\System32\\RPCRT4.dll+19d1a|C:\\windows\\System32\\RPCRT4.dll+19301|C:\\windows\\System32\\RPCRT4.dll+18d6e|C:\\windows\\System32\\RPCRT4.dll+169a5|C:\\windows\\SYSTEM32\\ntdll.dll+333ed|C:\\windows\\SYSTEM32\\ntdll.dll+34142|C:\\windows\\System32\\KERNEL32.DLL+17bd4|C:\\windows\\SYSTEM32\\ntdll.dll+6ce51",
+    "SourceModuleName": "eventlog",
+    "ProcessId": "452",
+    "SourceImage": "C:\\windows\\system32\\svchost.exe",
+    "EventReceivedTime": "2020-08-07 10:33:01",
+    "port": 60122,
+    "AccountName": "SYSTEM",
+    "UtcTime": "2020-08-07 14:33:00.025",
+    "GrantedAccess": "0x1000",
+    "Domain": "NT AUTHORITY",
+    "ExecutionProcessID": 3284,
+    "host": "wec.internal.cloudapp.net",
+    "SourceProcessId": "452",
+    "SourceThreadId": "2732",
+    "Severity": "INFO",
+    "TargetProcessId": "3140",
+    "SeverityValue": 2,
+    "EventID": 10,
+    "UserID": "S-1-5-18",
+    "ProviderGuid": "{5770385F-C22A-43E0-BF4C-06F5698FFBD9}",
+    "RecordNumber": 725771,
+    "SourceModuleType": "im_msvistalog",
+    "Keywords": -9223372036854775808,
+    "TargetImage": "C:\\windows\\System32\\svchost.exe",
+    "RuleName": "-"
+  },
+  "label": {
+    "alert_id": "27881e43475ab248",
+    "label": "benign",
+    "rationale": "step 4: svchost (452, lsm.dll) opens svchost (3140) with 0x1000, routine",
+    "seconds": null,
+    "labelled_at": null,
+    "labeller": "claude-proposed, varun-reviewed"
+  }
+}

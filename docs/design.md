@@ -45,7 +45,7 @@ Six of seven Tier-1 steps are deterministic; only the judgment step needs a mode
 | --- | --- | --- | --- |
 | 1 Read the alert | [D] | Structured fields; rule meaning is a lookup | Schema validation on parse |
 | 2 Check known noise | [D] | Allowlists, dedup counts, frequency | Unit tests on allowlist and dedup rules |
-| 3 Gather context | [D] | Fixed queries: host time window, process tree, user baseline, asset tier | Query tests against fixture logs |
+| 3 Gather context | [D] | Fixed, process-scoped queries: the triggering event, events from the same process, its parent and children, and that process's network events; plus user baseline and asset tier. Not a host time window | Query tests against fixture logs |
 | 4 Enrich indicators | [D] | Lookups against local threat-intel feeds (abuse.ch) | Known-bad fixtures must hit |
 | 4b Score evidence | [D] | Deterministic risk score; the baseline the LLM must beat | Scored on labelled set |
 | 5 Judge | [P] | Weighing mixed evidence, reading obfuscated command lines | Runtime verifier plus offline labels |
@@ -62,13 +62,14 @@ A deterministic pipeline carries every alert end to end; the model holds no exec
   -> [D] Sigma detection (Hayabusa / Chainsaw)
   -> [D] 1 Parse alert
   -> [D] 2 Noise filter (allowlist, dedup)  --known noise--> [D] Close as noise -> [S] Record
-  -> [D] 3 Context bundle (host window, process tree, user baseline, asset tier)
+  -> [D] 3 Context bundle, process-scoped (trigger event, same-process events,
+         parent and children, that process's network events; user baseline, asset tier)
        reads [S] human-confirmed prior verdicts only
   -> [D] 4 Enrichment (local threat-intel feeds)
   -> [D] 4b Evidence score (baseline)
   -> [P] 5 Triage call: verdict + confidence + cited event IDs
   -> [V] Verifier: schema, citation grounding, hard overrides,
-         baseline disagreement, injection tripwire
+         baseline disagreement, injection tripwire, trigger anchoring
   -> [D] 6 Route:
        malicious / any check failed      -> [H] Analyst queue (escalate)
        benign + rule type promoted        -> [D] Auto-close -> random audit sample -> [H]
@@ -123,6 +124,7 @@ The verifier guards only the close path, because errors are asymmetric: escalati
 4. **Baseline disagreement.** Model says benign while the evidence score says high risk: escalate.
 5. **Injection tripwire.** Instruction-like text in any log field is flagged in code and treated as an attack signal.
 6. **Calibrated confidence.** Close thresholds are set per rule type from the labelled set, never taken from the model's self-reported number.
+7. **Trigger anchoring.** The verdict must cite the triggering event; otherwise escalate. Catches verdicts reasoned from neighbouring activity instead of the alert itself (seen in the Phase 0 null test).
 
 Offline, every component is scored against the labels; the evidence score is the baseline row in every report.
 
@@ -328,3 +330,7 @@ CLAUDE.md tells Claude Code the architecture; hooks and tests enforce it. Instru
 - Hayabusa: https://github.com/Yamato-Security/hayabusa (v4.3.1 tested on the Phase 0 dataset)
 
 Other tool names (Chainsaw, Splunk BOTS, abuse.ch, vLLM, Ollama, import-linter) are from general knowledge; check each project's current docs before using it.
+
+## Change log
+
+- 2026-10-31: After the Phase 0 null test (`docs/null-test-results.md`). Step 3's context bundle is now process-scoped (trigger event, same-process events, parent and children, that process's network events) instead of a host time window. Added verifier check 7, trigger anchoring: the verdict must cite the triggering event, else escalate. Reason: both false alarms cited neighbouring PowerShell events and not their own triggering event.

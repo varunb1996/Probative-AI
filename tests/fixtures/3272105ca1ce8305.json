@@ -1,0 +1,69 @@
+{
+  "alert": {
+    "alert_id": "3272105ca1ce8305",
+    "rule_title": "Network Connection Initiated By PowerShell Process",
+    "rule_level": "low",
+    "mitre_tags": [
+      "T1059.001"
+    ],
+    "host": "WORKSTATION5.theshire.local",
+    "user": null,
+    "timestamp": "2020-08-07T14:32:52.795000+00:00",
+    "event_ids": [
+      "Security:202260"
+    ]
+  },
+  "event": {
+    "event_id": "Security:202260",
+    "tags": [
+      "mordorDataset"
+    ],
+    "@version": "1",
+    "EventType": "AUDIT_SUCCESS",
+    "Version": 1,
+    "ThreadID": 2532,
+    "EventTime": "2020-08-07 10:32:51",
+    "Task": 12810,
+    "DestAddress": "10.10.10.5",
+    "SourcePort": "65385",
+    "Channel": "Security",
+    "SourceName": "Microsoft-Windows-Security-Auditing",
+    "OpcodeValue": 0,
+    "Hostname": "WORKSTATION5.theshire.local",
+    "@timestamp": "2020-08-07T14:32:52.795Z",
+    "Message": "The Windows Filtering Platform has permitted a connection.\r\n\r\nApplication Information:\r\n\tProcess ID:\t\t1648\r\n\tApplication Name:\t\\device\\harddiskvolume2\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe\r\n\r\nNetwork Information:\r\n\tDirection:\t\tOutbound\r\n\tSource Address:\t\t172.18.39.5\r\n\tSource Port:\t\t65385\r\n\tDestination Address:\t10.10.10.5\r\n\tDestination Port:\t\t80\r\n\tProtocol:\t\t6\r\n\r\nFilter Information:\r\n\tFilter Run-Time ID:\t69420\r\n\tLayer Name:\t\tConnect\r\n\tLayer Run-Time ID:\t48",
+    "Category": "Filtering Platform Connection",
+    "Opcode": "Info",
+    "SourceModuleName": "eventlog",
+    "ProcessId": "1648",
+    "EventReceivedTime": "2020-08-07 10:32:52",
+    "port": 60122,
+    "Application": "\\device\\harddiskvolume2\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe",
+    "ExecutionProcessID": 4,
+    "Direction": "%%14593",
+    "RemoteMachineID": "S-1-0-0",
+    "host": "wec.internal.cloudapp.net",
+    "DestPort": "80",
+    "Severity": "INFO",
+    "LayerRTID": "48",
+    "LayerName": "%%14611",
+    "SeverityValue": 2,
+    "EventID": 5156,
+    "SourceAddress": "172.18.39.5",
+    "ProviderGuid": "{54849625-5478-4994-A5BA-3E3B0328C30D}",
+    "RecordNumber": 202260,
+    "SourceModuleType": "im_msvistalog",
+    "Keywords": -9214364837600034816,
+    "FilterRTID": "69420",
+    "Protocol": "6",
+    "RemoteUserID": "S-1-0-0"
+  },
+  "label": {
+    "alert_id": "3272105ca1ce8305",
+    "label": "malicious",
+    "rationale": "step 1/2: ProcessId 1648 (0x670), DestAddress 10.10.10.5:80",
+    "seconds": null,
+    "labelled_at": null,
+    "labeller": "claude-proposed, varun-reviewed"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "alert": {
+    "alert_id": "760bf9479ecb02ec",
+    "rule_title": "Proc Access",
+    "rule_level": "low",
+    "mitre_tags": [],
+    "host": "WORKSTATION6.theshire.local",
+    "user": "NT AUTHORITY\\SYSTEM",
+    "timestamp": "2020-08-07T14:33:01.253000+00:00",
+    "event_ids": [
+      "Microsoft-Windows-Sysmon/Operational:659149"
+    ]
+  },
+  "event": {
+    "event_id": "Microsoft-Windows-Sysmon/Operational:659149",
+    "tags": [
+      "mordorDataset"
+    ],
+    "TargetProcessGUID": "{49a15388-5c3a-5f2b-1600-000000000400}",
+    "@version": "1",
+    "EventType": "INFO",
+    "Version": 3,
+    "ThreadID": 4496,
+    "EventTime": "2020-08-07 10:33:00",
+    "Task": 10,
+    "AccountType": "User",
+    "SourceProcessGUID": "{49a15388-5c39-5f2b-1200-000000000400}",
+    "CallTrace": "C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|c:\\windows\\system32\\lsm.dll+1a207|C:\\windows\\System32\\RPCRT4.dll+76953|C:\\windows\\System32\\RPCRT4.dll+da036|C:\\windows\\System32\\RPCRT4.dll+38289|C:\\windows\\System32\\combase.dll+9e2bf|C:\\windows\\System32\\combase.dll+154c3|C:\\windows\\System32\\combase.dll+152b3|C:\\windows\\System32\\combase.dll+a1166|C:\\windows\\System32\\combase.dll+3c3fa|C:\\windows\\System32\\combase.dll+9cdad|C:\\windows\\System32\\combase.dll+52acc|C:\\windows\\System32\\combase.dll+53331|C:\\windows\\System32\\combase.dll+54ad8|C:\\windows\\System32\\RPCRT4.dll+548c8|C:\\windows\\System32\\RPCRT4.dll+2c921|C:\\windows\\System32\\RPCRT4.dll+2c470|C:\\windows\\System32\\RPCRT4.dll+1a6bf|C:\\windows\\System32\\RPCRT4.dll+19d1a|C:\\windows\\System32\\RPCRT4.dll+19301|C:\\windows\\System32\\RPCRT4.dll+18d6e|C:\\windows\\System32\\RPCRT4.dll+169a5|C:\\windows\\SYSTEM32\\ntdll.dll+333ed",
+    "Channel": "Microsoft-Windows-Sysmon/Operational",
+    "SourceName": "Microsoft-Windows-Sysmon",
+    "OpcodeValue": 0,
+    "Hostname": "WORKSTATION6.theshire.local",
+    "@timestamp": "2020-08-07T14:33:01.253Z",
+    "Message": "Process accessed:\r\nRuleName: -\r\nUtcTime: 2020-08-07 14:33:00.008\r\nSourceProcessGUID: {49a15388-5c39-5f2b-1200-000000000400}\r\nSourceProcessId: 380\r\nSourceThreadId: 5924\r\nSourceImage: C:\\windows\\system32\\svchost.exe\r\nTargetProcessGUID: {49a15388-5c3a-5f2b-1600-000000000400}\r\nTargetProcessId: 1048\r\nTargetImage: C:\\windows\\System32\\svchost.exe\r\nGrantedAccess: 0x40\r\nCallTrace: C:\\windows\\SYSTEM32\\ntdll.dll+9c534|C:\\windows\\System32\\KERNELBASE.dll+2726e|c:\\windows\\system32\\lsm.dll+1a207|C:\\windows\\System32\\RPCRT4.dll+76953|C:\\windows\\System32\\RPCRT4.dll+da036|C:\\windows\\System32\\RPCRT4.dll+38289|C:\\windows\\System32\\combase.dll+9e2bf|C:\\windows\\System32\\combase.dll+154c3|C:\\windows\\System32\\combase.dll+152b3|C:\\windows\\System32\\combase.dll+a1166|C:\\windows\\System32\\combase.dll+3c3fa|C:\\windows\\System32\\combase.dll+9cdad|C:\\windows\\System32\\combase.dll+52acc|C:\\windows\\System32\\combase.dll+53331|C:\\windows\\System32\\combase.dll+54ad8|C:\\windows\\System32\\RPCRT4.dll+548c8|C:\\windows\\System32\\RPCRT4.dll+2c921|C:\\windows\\System32\\RPCRT4.dll+2c470|C:\\windows\\System32\\RPCRT4.dll+1a6bf|C:\\windows\\System32\\RPCRT4.dll+19d1a|C:\\windows\\System32\\RPCRT4.dll+19301|C:\\windows\\System32\\RPCRT4.dll+18d6e|C:\\windows\\System32\\RPCRT4.dll+169a5|C:\\windows\\SYSTEM32\\ntdll.dll+333ed",
+    "SourceModuleName": "eventlog",
+    "ProcessId": "380",
+    "SourceImage": "C:\\windows\\system32\\svchost.exe",
+    "EventReceivedTime": "2020-08-07 10:33:01",
+    "port": 60122,
+    "AccountName": "SYSTEM",
+    "UtcTime": "2020-08-07 14:33:00.008",
+    "GrantedAccess": "0x40",
+    "Domain": "NT AUTHORITY",
+    "ExecutionProcessID": 3432,
+    "host": "wec.internal.cloudapp.net",
+    "SourceProcessId": "380",
+    "SourceThreadId": "5924",
+    "Severity": "INFO",
+    "TargetProcessId": "1048",
+    "SeverityValue": 2,
+    "EventID": 10,
+    "UserID": "S-1-5-18",
+    "ProviderGuid": "{5770385F-C22A-43E0-BF4C-06F5698FFBD9}",
+    "RecordNumber": 659149,
+    "SourceModuleType": "im_msvistalog",
+    "Keywords": -9223372036854775808,
+    "TargetImage": "C:\\windows\\System32\\svchost.exe",
+    "RuleName": "-"
+  },
+  "label": {
+    "alert_id": "760bf9479ecb02ec",
+    "label": "benign",
+    "rationale": "step 4: WORKSTATION6 svchost (380, lsm.dll) opens svchost (1048) with 0x40, routine",
+    "seconds": null,
+    "labelled_at": null,
+    "labeller": "claude-proposed, varun-reviewed"
+  }
+}

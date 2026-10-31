@@ -1,0 +1,82 @@
+{
+  "alert": {
+    "alert_id": "44f255f374992221",
+    "rule_title": "Local Accounts Discovery",
+    "rule_level": "low",
+    "mitre_tags": [
+      "T1033",
+      "T1087.001"
+    ],
+    "host": "WORKSTATION5.theshire.local",
+    "user": "THESHIRE\\pgustavo",
+    "timestamp": "2020-08-07T14:32:47.591000+00:00",
+    "event_ids": [
+      "Microsoft-Windows-Sysmon/Operational:725679"
+    ]
+  },
+  "event": {
+    "event_id": "Microsoft-Windows-Sysmon/Operational:725679",
+    "@version": "1",
+    "EventType": "INFO",
+    "AccountType": "User",
+    "ThreadID": 4364,
+    "Channel": "Microsoft-Windows-Sysmon/Operational",
+    "OpcodeValue": 0,
+    "OriginalFileName": "whoami.exe",
+    "Hostname": "WORKSTATION5.theshire.local",
+    "@timestamp": "2020-08-07T14:32:47.591Z",
+    "ParentCommandLine": "\"C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -noP -sta -w 1 -enc [Empire -enc payload, 5008 chars, removed for AV]",
+    "ProcessId": "6504",
+    "ParentProcessId": "1648",
+    "host": "wec.internal.cloudapp.net",
+    "Severity": "INFO",
+    "SeverityValue": 2,
+    "Image": "C:\\Windows\\System32\\whoami.exe",
+    "LogonGuid": "{297bc33e-60f0-5f2b-22a6-2b0000000000}",
+    "SourceModuleType": "im_msvistalog",
+    "FileVersion": "10.0.18362.1 (WinBuild.160101.0800)",
+    "Version": 5,
+    "Company": "Microsoft Corporation",
+    "EventTime": "2020-08-07 10:32:45",
+    "Task": 1,
+    "SourceName": "Microsoft-Windows-Sysmon",
+    "CurrentDirectory": "C:\\windows\\system32\\",
+    "Message": "Process Create:\r\nRuleName: -\r\nUtcTime: 2020-08-07 14:32:45.881\r\nProcessGuid: {297bc33e-660d-5f2d-8407-000000000400}\r\nProcessId: 6504\r\nImage: C:\\Windows\\System32\\whoami.exe\r\nFileVersion: 10.0.18362.1 (WinBuild.160101.0800)\r\nDescription: whoami - displays logged on user information\r\nProduct: Microsoft® Windows® Operating System\r\nCompany: Microsoft Corporation\r\nOriginalFileName: whoami.exe\r\nCommandLine: \"C:\\windows\\system32\\whoami.exe\" /user\r\nCurrentDirectory: C:\\windows\\system32\\\r\nUser: THESHIRE\\pgustavo\r\nLogonGuid: {297bc33e-60f0-5f2b-22a6-2b0000000000}\r\nLogonId: 0x2BA622\r\nTerminalSessionId: 2\r\nIntegrityLevel: High\r\nHashes: SHA1=8F1F9E265911956C7F8F3861C34DEF9B8FA63813,MD5=2EEEEC89E705F73FFBCAE014E1828788,SHA256=A8A4C4719113B071BB50D67F6E12C188B92C70EEAFDFCD6F5DA69B6AAA99A7FD,IMPHASH=7FF0758B766F747CE57DFAC70743FB88\r\nParentProcessGuid: {297bc33e-65d0-5f2d-8207-000000000400}\r\nParentProcessId: 1648\r\nParentImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nParentCommandLine: \"C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -noP -sta -w 1 -enc [Empire -enc payload, 5008 chars, removed for AV]",
+    "IntegrityLevel": "High",
+    "CommandLine": "\"C:\\windows\\system32\\whoami.exe\" /user",
+    "ParentImage": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "SourceModuleName": "eventlog",
+    "LogonId": "0x2ba622",
+    "port": 60122,
+    "AccountName": "SYSTEM",
+    "EventReceivedTime": "2020-08-07 10:32:47",
+    "UtcTime": "2020-08-07 14:32:45.881",
+    "Domain": "NT AUTHORITY",
+    "ExecutionProcessID": 3284,
+    "User": "THESHIRE\\pgustavo",
+    "Hashes": "SHA1=8F1F9E265911956C7F8F3861C34DEF9B8FA63813,MD5=2EEEEC89E705F73FFBCAE014E1828788,SHA256=A8A4C4719113B071BB50D67F6E12C188B92C70EEAFDFCD6F5DA69B6AAA99A7FD,IMPHASH=7FF0758B766F747CE57DFAC70743FB88",
+    "Description": "whoami - displays logged on user information",
+    "TerminalSessionId": "2",
+    "ParentProcessGuid": "{297bc33e-65d0-5f2d-8207-000000000400}",
+    "UserID": "S-1-5-18",
+    "EventID": 1,
+    "Product": "Microsoft® Windows® Operating System",
+    "ProviderGuid": "{5770385F-C22A-43E0-BF4C-06F5698FFBD9}",
+    "RecordNumber": 725679,
+    "Keywords": -9223372036854775808,
+    "ProcessGuid": "{297bc33e-660d-5f2d-8407-000000000400}",
+    "tags": [
+      "mordorDataset"
+    ],
+    "RuleName": "-"
+  },
+  "label": {
+    "alert_id": "44f255f374992221",
+    "label": "malicious",
+    "rationale": "step 1: whoami.exe /user, ParentProcessId 1648 / parent GUID = attacker",
+    "seconds": null,
+    "labelled_at": null,
+    "labeller": "claude-proposed, varun-reviewed"
+  },
+  "redacted": "The Empire -enc payload (base64) in ParentCommandLine, Message was replaced with a marker so antivirus does not quarantine the file. Hashes and everything else are unchanged."
+}
