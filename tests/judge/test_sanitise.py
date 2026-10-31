@@ -27,6 +27,11 @@ def test_control_characters_and_bidi_overrides_are_stripped():
     assert clean("pow\x00er\x1bshell‮.exe\tok\n") == "powershell.exe\tok\n"
 
 
+def test_values_are_capped_at_500_characters():
+    # Decision 2026-10-31: 500 (was 2,000) so every prompt fits a free-tier per-request token cap.
+    assert MAX_VALUE == 500
+
+
 def test_values_are_capped():
     out = clean("A" * (MAX_VALUE + 500))
     assert len(out) < MAX_VALUE + 50 and out.endswith("[truncated]")
