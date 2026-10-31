@@ -38,9 +38,11 @@ def test_structured_output_can_be_switched_off_in_env():
     assert not InferenceConfig.from_env({**_ENV, "STRUCTURED_OUTPUT": "false"}).structured_output
 
 
-def _capture(sent):
+def _capture(sent, headers=None):
     def urlopen(request, timeout):
         sent.append(json.loads(request.data))
+        if headers is not None:
+            headers.append(dict(request.header_items()))
         return io.BytesIO(json.dumps({"choices": [{"message": {"content": "{}"}}],
                                       "usage": {"total_tokens": 7}}).encode())
     return urlopen
@@ -52,6 +54,15 @@ def test_schema_is_sent_only_when_structured_output_is_on(monkeypatch):
     OpenAICompatibleClient(CLOUD).complete([], {"type": "object"})
     OpenAICompatibleClient(CLOUD.model_copy(update={"structured_output": False})).complete([], {})
     assert "response_format" in sent[0] and "response_format" not in sent[1]
+
+
+def test_requests_carry_a_project_user_agent(monkeypatch):
+    # Cloudflare in front of some endpoints (e.g. Groq) blocks urllib's default agent with 403/1010.
+    headers = []
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", _capture([], headers))
+    OpenAICompatibleClient(CLOUD).complete([], {})
+    agent = {k.lower(): v for k, v in headers[0].items()}["user-agent"]
+    assert agent.startswith("probative-ai/") and "urllib" not in agent.lower()
 
 
 def test_other_http_errors_are_plain_inference_errors(monkeypatch):

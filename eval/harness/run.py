@@ -163,7 +163,7 @@ def _miss_bound(m: dict) -> str:
     if m["closed"] == 0:
         return "no closes"
     if m["mal_closed"] == 0:
-        return f"< {3 / m['closed']:.0%}"
+        return f"< {3 / m['closed']:.0%}" if m["closed"] > 3 else "< 100% (too few closes)"
     return f"observed {m['mal_closed']}/{m['closed']}"
 
 

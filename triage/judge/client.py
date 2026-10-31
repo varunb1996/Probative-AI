@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 from triage.domain import Alert
 
 PUBLIC = "public"
+USER_AGENT = "probative-ai/0.1"
 
 
 class CloudRefused(Exception):
@@ -84,7 +85,8 @@ class OpenAICompatibleClient:
         if self.config.structured_output:
             body["response_format"] = {"type": "json_schema",
                                        "json_schema": {"name": "verdict", "strict": True, "schema": schema}}
-        headers = {"Content-Type": "application/json"}
+        # urllib's default agent is blocked by Cloudflare in front of some endpoints (403, code 1010).
+        headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         request = urllib.request.Request(
