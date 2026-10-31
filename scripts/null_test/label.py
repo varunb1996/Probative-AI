@@ -208,6 +208,33 @@ def summary(e: dict) -> str:
     return "  ".join(parts) + (f"  | {first}" if first else "") + attacker_mark(e)
 
 
+KEY_FIELDS = ["Image", "ProcessName", "NewProcessName", "ProcessId", "NewProcessId", "ProcessGuid",
+              "SourceImage", "SourceProcessId", "SourceProcessGUID", "TargetImage", "TargetProcessId",
+              "TargetProcessGUID", "GrantedAccess", "ObjectName", "AccessMask", "ParentImage", "ParentProcessId",
+              "CommandLine", "ParentCommandLine", "DestinationIp", "DestAddress", "DestinationPort", "DestPort",
+              "User", "SubjectUserName", "TargetUserName"]
+MAX_VALUE = 150
+
+
+def key_fields(e: dict) -> list[str]:
+    """The fields that usually decide a label, one per line, for the recap above the prompt."""
+    lines = []
+    for key in KEY_FIELDS:
+        if key in e and e[key] not in (None, "", "-"):
+            value = pid_text(e[key]) if _is_pid_field(key) else " ".join(str(e[key]).split())
+            if len(value) > MAX_VALUE:
+                value = value[:MAX_VALUE] + "..."
+            lines.append(f"{key:<20} {value}")
+    return lines
+
+
+def show_recap(alert: dict, trigger: dict) -> None:
+    print(f"\n  --- {alert['rule_title']} on {alert['host'].split('.')[0]}: triggering event "
+          f"{trigger['event_id']}{attacker_mark(trigger)}")
+    for line in key_fields(trigger):
+        print(f"    {line}")
+
+
 def show_event(e: dict) -> None:
     for key in sorted(e):
         if key in ("Message", "tags", "@version", "Keywords"):
@@ -295,6 +322,7 @@ def run_labelling(args, sample: list[tuple[str, str]]) -> None:
         show_alert(sample_ids.index(alert_id) + 1, len(sample_ids), alert, groups[alert_id], before, trigger, after)
         started = time.monotonic()
         while True:
+            show_recap(alert, trigger)
             choice = ask("\n  label [m]alicious / [b]enign, [?] full neighbour messages, [q]uit: ",
                          {"m", "b", "?", "q"}).lower()
             if choice == "?":

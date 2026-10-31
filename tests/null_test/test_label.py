@@ -169,6 +169,24 @@ def test_summary_ignores_rows_outside_the_sample():
     assert "labelled 1/1" in text and "avg 2.0s" in text
 
 
+# --- key-field recap --------------------------------------------------------
+
+def test_key_fields_lists_present_fields_with_pids_in_both_forms():
+    e = {"event_id": "Sysmon:1", "Hostname": "WORKSTATION5.theshire.local", "SourceImage": "C:\\x\\svchost.exe",
+         "SourceProcessId": "1784", "TargetImage": "C:\\x\\lsass.exe", "GrantedAccess": "0x1000",
+         "Message": "not a key field"}
+    lines = label.key_fields(e)
+    assert "SourceImage          C:\\x\\svchost.exe" in lines
+    assert "SourceProcessId      1784 (0x6f8)" in lines
+    assert "GrantedAccess        0x1000" in lines
+    assert not any("Message" in line or "Hostname" in line for line in lines)
+
+
+def test_key_fields_truncates_long_values():
+    lines = label.key_fields({"CommandLine": "x" * 500})
+    assert len(lines) == 1 and len(lines[0]) < 200 and lines[0].endswith("...")
+
+
 # --- spot check -------------------------------------------------------------
 
 def test_spotcheck_draws_six_unsampled_alerts_across_groups():
