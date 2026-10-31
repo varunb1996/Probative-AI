@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SUMMARY_MAX_WORDS = 80  # part of the output contract, not a routing policy
 
@@ -33,6 +33,7 @@ class Alert(BaseModel):
     user: str | None  # absent on some channels, e.g. Security 5156
     timestamp: datetime
     event_ids: list[str]
+    dataset: str | None = None  # "public" is what lets a cloud model see this alert
 
 
 class ProcessRef(BaseModel):
@@ -116,6 +117,34 @@ class Verdict(BaseModel):
         if len(value.split()) > SUMMARY_MAX_WORDS:
             raise ValueError(f"summary must be at most {SUMMARY_MAX_WORDS} words")
         return value
+
+
+class JudgeResult(BaseModel):
+    """Outcome of one triage call: a verdict, or no verdict and the reason (which escalates).
+
+    `shown_event_ids` are the events the model actually saw; citations are checked against them.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    alert_id: str
+    verdict: Verdict | None = None
+    attempts: int
+    error: str | None = None
+    shown_event_ids: list[str]
+    tokens_used: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return self.verdict is not None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "JudgeResult":
+        if self.verdict is None and not self.error:
+            raise ValueError("a failed judge result must say why")
+        if self.verdict is not None and self.verdict.alert_id != self.alert_id:
+            raise ValueError("verdict is for a different alert")
+        return self
 
 
 class RuleMode(StrEnum):

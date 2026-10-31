@@ -24,8 +24,8 @@ def parse_event(raw: dict[str, Any]) -> Event:
     )
 
 
-def parse_alert(record: dict[str, Any], event: Event) -> Alert:
-    """Hayabusa detection + the raw event it fired on -> Alert.
+def parse_alert(record: dict[str, Any], event: Event, dataset: str | None = None) -> Alert:
+    """Hayabusa detection + the raw event it fired on -> Alert, tagged with its dataset.
 
     Raises ValueError if the record does not belong to the event or its level is unknown.
     """
@@ -45,6 +45,7 @@ def parse_alert(record: dict[str, Any], event: Event) -> Alert:
         user=_pick_user(record, raw),
         timestamp=datetime.strptime(record["Timestamp"], "%Y-%m-%d %H:%M:%S.%f %z"),
         event_ids=[event.event_id],
+        dataset=dataset,
     )
 
 
