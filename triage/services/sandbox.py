@@ -41,13 +41,14 @@ log = logging.getLogger("triage.sandbox")
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_EVENTS = 50_000
-MAX_ALERTS = 400
+MAX_ALERTS = 150          # each alert's evidence bundle is stored; the free Neon tier is small
 PER_CASE_LLM = 5
 DAILY_LLM_CAP = 30
 CASE_TTL = timedelta(hours=24)
 CASES_PER_HOUR = 3
 CASES = "cases"                     # queue stream of cases waiting to be processed
 UPLOADS = Path(tempfile.gettempdir()) / "probative-uploads"
+_SEVERITY = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 _REQUIRED = ("Channel", "RecordNumber", "Hostname", "EventID", "@timestamp")
 _OTRF = "https://raw.githubusercontent.com/OTRF/Security-Datasets/master/datasets/atomic/windows/"
 
@@ -273,8 +274,11 @@ def build_case(conn: psycopg.Connection, case_id: str, raw_events: list[dict], d
             continue
         alert = parse_alert(det, trigger, dataset="public")
         pairs.append((alert.model_copy(update={"alert_id": f"{case_id}-{alert.alert_id}"}), trigger))
-    if len(pairs) > MAX_ALERTS:
-        raise SandboxError(f"{len(pairs)} alerts is more than the sandbox's {MAX_ALERTS}; try a smaller file")
+    note = ""
+    if len(pairs) > MAX_ALERTS:   # keep the most severe, earliest first; say what was set aside
+        pairs.sort(key=lambda p: (-_SEVERITY.get(p[0].rule_level, 0), p[0].timestamp, p[0].alert_id))
+        note = f"triaged the {MAX_ALERTS} most severe of {len(pairs)} alerts; the rest were set aside"
+        pairs = pairs[:MAX_ALERTS]
 
     repo.upsert_events(conn, events, case_id=case_id)
     for alert, trigger in pairs:
@@ -286,7 +290,7 @@ def build_case(conn: psycopg.Connection, case_id: str, raw_events: list[dict], d
         queue.enqueue(conn, workers.ENRICHED, alert.alert_id,
                       {"bundle": bundle.model_dump(mode="json"), "score": evidence.model_dump(mode="json")},
                       priority=int(evidence.total * 10))
-    repo.update_case(conn, case_id, status="ready", n_events=len(events), n_alerts=len(pairs))
+    repo.update_case(conn, case_id, status="ready", n_events=len(events), n_alerts=len(pairs), detail=note)
 
 
 def process_case(conn: psycopg.Connection, case_id: str, path: Path, fmt: str) -> None:

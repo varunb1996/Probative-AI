@@ -392,6 +392,8 @@ def case(case: dict, triaged: int, analyst_queue: list[dict], suggestions: list[
         line = (f"<div class='status'>{'<span class=pulse></span>' if working else ''}"
                 f"{case['n_events']:,} events · {n_alerts} alerts · {triaged} triaged"
                 f"{' · refreshing' if working else ''}</div><div class='progress'><i style='--v:{pct:.0f}%'></i></div>")
+        if case["detail"]:
+            line += f"<p class='lede' style='margin-top:16px'>Note: {escape(case['detail'])}.</p>"
         if n_alerts == 0:
             line += "<p class='lede' style='margin-top:16px'>No Sigma rule above informational level fired on this file.</p>"
     body = (

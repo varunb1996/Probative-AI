@@ -1,7 +1,7 @@
 """The sandbox end to end on the Neon test branch: case build, budget gate, expiry, Hayabusa."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -76,12 +76,24 @@ def test_sweep_deletes_expired_cases(conn):
     assert conn.execute("select count(*) as n from events where case_id = %s", (old,)).fetchone()["n"] == 0
 
 
-def test_too_many_alerts_fails_the_case_with_a_reason(conn, monkeypatch):
+def test_too_many_alerts_keeps_the_most_severe_and_says_so(conn, monkeypatch):
+    # Changed 2026-11-01: a big file is no longer refused; the most severe alerts are kept.
     monkeypatch.setattr(sandbox, "MAX_ALERTS", 2)
     case_id = sandbox.new_case_id()
     repo.create_case(conn, case_id, "upload", "x", client="c", ttl=timedelta(hours=24))
-    with pytest.raises(sandbox.SandboxError, match="alerts"):
-        sandbox.build_case(conn, case_id, _raw_events(), _detections())
+    sandbox.build_case(conn, case_id, _raw_events(), _detections())
+    c = repo.get_case(conn, case_id)
+    assert c["status"] == "ready" and c["n_alerts"] == 2
+    assert "2 most severe of 5" in c["detail"]
+    kept = [r["alert"] for r in conn.execute("select alert from alerts where case_id = %s", (case_id,)).fetchall()]
+    lows = sorted((a for a in _all_alerts() if a["rule_level"] == "low"), key=lambda a: a["timestamp"])
+    assert sorted(a["rule_level"] for a in kept) == ["low", "medium"]     # the one medium, then the earliest low
+    when = lambda a: datetime.fromisoformat(a["timestamp"])  # noqa: E731 - stored as ...Z, fixtures as +00:00
+    assert any(when(a) == when(lows[0]) and a["rule_title"] == lows[0]["rule_title"] for a in kept)
+
+
+def _all_alerts():
+    return [json.loads((FIXTURES / f"{a}.json").read_text(encoding="utf-8"))["alert"] for a in IDS]
 
 
 def test_hayabusa_finds_the_golden_detections_in_a_json_file(tmp_path):
