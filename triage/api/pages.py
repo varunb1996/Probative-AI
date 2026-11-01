@@ -114,6 +114,7 @@ dd { margin: 0; word-break: break-word; }
 .checks .pass::before { content: "\\2713"; color: var(--close); }
 .checks .fail::before { content: "\\2717"; color: var(--escalate); }
 .checks .fail { color: var(--escalate); }
+.checks.steps li { display: block; overflow-wrap: anywhere; }
 .checks small { grid-column: 2; font: 400 11px var(--mono); color: var(--ink-soft); word-break: break-all; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tags span { font: 400 11px var(--mono); padding: 3px 8px; border: 1px solid var(--rule); background: var(--paper); }
@@ -473,5 +474,5 @@ def _investigation_panel(inv: dict | None) -> str:
         ending = (f"<p><b>Ended:</b> {escape(inv['stop_reason'])}. Handed to the analyst with this log; "
                   "the investigator never closes an alert it could not verify.</p>")
     return (f"<section class='panel evidence' style='--i:2'><h3>Investigation · {state['step_count']} steps · "
-            f"{state['tokens_used']:,} tokens · read-only tools</h3><ol class='checks'>{''.join(steps)}</ol>"
+            f"{state['tokens_used']:,} tokens · read-only tools</h3><ol class='checks steps'>{''.join(steps)}</ol>"
             f"{ending}</section>")
