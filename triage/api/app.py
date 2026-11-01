@@ -84,8 +84,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                  "case_id": repo.alert_case(conn, alert_id)})
 
     def client_of(request: Request) -> str:
-        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        return sandbox.client_hash(forwarded or (request.client.host if request.client else "unknown"))
+        address, _ = sandbox.client_address(dict(request.headers), request.client.host if request.client else None)
+        return sandbox.client_hash(address)
+
+    @app.get("/api/whoami")
+    def whoami(request: Request) -> dict:
+        """Which header identified you, and a short hash of it (never the address): checks rate limiting."""
+        address, source = sandbox.client_address(dict(request.headers), request.client.host if request.client else None)
+        return {"client": sandbox.client_hash(address)[:8], "source": source}
 
     def admit_case(conn: psycopg.Connection, client: str) -> None:
         if repo.cases_since(conn, client, ONE_HOUR) >= sandbox.CASES_PER_HOUR:

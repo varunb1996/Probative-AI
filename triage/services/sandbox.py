@@ -86,6 +86,18 @@ def case_event_id(case_id: str, event_id: str) -> str:
     return f"{case_id}/{event_id}"
 
 
+def client_address(headers: dict[str, str], peer: str | None) -> tuple[str, str]:
+    """The visitor's address and where it came from. On Render, Cloudflare sits in front and sets
+    CF-Connecting-IP, which a visitor cannot forge; the direct peer is only a proxy there."""
+    cf = (headers.get("cf-connecting-ip") or "").strip()
+    if cf:
+        return cf, "cf-connecting-ip"
+    forwarded = (headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if forwarded:
+        return forwarded, "x-forwarded-for"
+    return peer or "unknown", "peer"
+
+
 def client_hash(address: str) -> str:
     """Rate limiting needs to recognise a client, not to know its address."""
     return hashlib.sha256(f"probative-ai:{address}".encode()).hexdigest()[:24]

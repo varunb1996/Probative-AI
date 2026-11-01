@@ -134,3 +134,12 @@ def test_extra_rules_are_added_to_the_proven_list_once(tmp_path):
 def test_the_powershell_c2_rule_is_kept_under_proven_rules():
     ids = sandbox.read_rule_ids(sandbox.EXTRA_PROVEN)
     assert "9e00ae65-e5aa-2c89-c7a1-7b6ee0e194f5" in ids
+
+
+def test_client_address_prefers_cloudflare_then_forwarded_then_peer():
+    assert sandbox.client_address({"cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "10.0.0.1"}, "10.1.1.1") == (
+        "203.0.113.9", "cf-connecting-ip")
+    assert sandbox.client_address({"x-forwarded-for": "198.51.100.7, 10.0.0.1"}, "10.1.1.1") == (
+        "198.51.100.7", "x-forwarded-for")
+    assert sandbox.client_address({}, "127.0.0.1") == ("127.0.0.1", "peer")
+    assert sandbox.client_address({"cf-connecting-ip": "  "}, None) == ("unknown", "peer")

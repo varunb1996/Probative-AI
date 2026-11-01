@@ -119,3 +119,17 @@ def test_creating_a_case_sweeps_expired_ones(client, conn):
     repo.create_case(conn, old, "upload", "x", client="other", ttl=timedelta(seconds=-1))
     client.post("/api/cases/upload", content=_jsonl(), headers=DECLARED)
     assert repo.get_case(conn, old) is None
+
+
+def test_whoami_names_the_source_and_never_the_address(client):
+    body = client.get("/api/whoami", headers={"CF-Connecting-IP": "203.0.113.9"}).json()
+    assert body["source"] == "cf-connecting-ip"
+    assert "203.0.113.9" not in str(body) and len(body["client"]) == 8
+
+
+def test_different_cloudflare_clients_get_separate_limits(client, monkeypatch):
+    monkeypatch.setattr(sandbox, "CASES_PER_HOUR", 1)
+    a, b = {**DECLARED, "CF-Connecting-IP": "203.0.113.1"}, {**DECLARED, "CF-Connecting-IP": "203.0.113.2"}
+    assert client.post("/api/cases/upload", content=_jsonl(), headers=a).status_code == 202
+    assert client.post("/api/cases/upload", content=_jsonl(), headers=b).status_code == 202
+    assert client.post("/api/cases/upload", content=_jsonl(), headers=a).status_code == 429
