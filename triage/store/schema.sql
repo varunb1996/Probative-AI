@@ -60,8 +60,14 @@ create table if not exists audit_log (
     at       timestamptz not null default now()
 );
 
+alter table audit_log add column if not exists case_id text;
+
+-- Append-only. The one exception is retention: a sandbox case's rows may be deleted after 24 hours.
 create or replace function audit_log_append_only() returns trigger language plpgsql as $$
 begin
+    if tg_op = 'DELETE' and old.case_id is not null and old.at < now() - interval '24 hours' then
+        return old;
+    end if;
     raise exception 'audit_log is append-only';
 end $$;
 drop trigger if exists audit_log_no_change on audit_log;
@@ -81,3 +87,23 @@ create table if not exists queue (
     unique (stream, alert_id)
 );
 create index if not exists queue_claim on queue (stream, status, priority desc, id);
+
+-- Sandbox cases: a visitor's scenario or upload. Their events and alerts carry the case_id,
+-- and the whole case is deleted when it expires. Demo data has no case_id.
+create table if not exists cases (
+    case_id    text primary key,
+    source     text not null check (source in ('scenario', 'upload')),
+    name       text not null,
+    client     text not null,                -- a hash of the requester, for rate limits only
+    status     text not null default 'queued' check (status in ('queued', 'processing', 'ready', 'failed')),
+    detail     text not null default '',
+    n_events   integer not null default 0,
+    n_alerts   integer not null default 0,
+    llm_used   integer not null default 0,
+    created_at timestamptz not null default now(),
+    expires_at timestamptz not null
+);
+alter table events add column if not exists case_id text;
+alter table alerts add column if not exists case_id text;
+create index if not exists events_case on events (case_id, host);
+create index if not exists alerts_case on alerts (case_id);

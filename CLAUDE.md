@@ -28,6 +28,8 @@ The model PROPOSES. Code DECIDES and EXECUTES. Never the other way round.
 - Never give the model write access or side effects. The triage call has no tools. Investigator tools are read-only.
 - Never swallow a verifier failure (no bare `except`, no silent fallback to "benign"). Failure means escalate.
 - Never send data to a cloud model unless `allow_cloud=true` AND every alert is tagged `dataset=public`.
+  The tag comes from provenance (OTRF datasets) or, for sandbox uploads, from the uploader's
+  explicit "no private data" declaration (decision 2026-11-01). Nothing else may set it.
 - Never add a dependency, service, vector store, or framework that the design does not name. Ask first.
 
 ## Module boundaries (enforced by `lint-imports` after every edit)

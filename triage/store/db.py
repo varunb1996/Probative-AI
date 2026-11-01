@@ -6,7 +6,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 SCHEMA = Path(__file__).with_name("schema.sql")
-TABLES = ("queue", "audit_log", "human_decisions", "verdicts", "rule_modes", "alerts", "events")
+TABLES = ("queue", "audit_log", "human_decisions", "verdicts", "rule_modes", "alerts", "events", "cases")
 
 
 def connect(url: str) -> psycopg.Connection:
