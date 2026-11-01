@@ -1,6 +1,6 @@
 """Leave-one-out close thresholds. Synthetic rows only; never reads labels."""
 
-from eval.harness.calibrate import Row, loo_thresholds
+from eval.harness.calibrate import Row, fit_thresholds, loo_thresholds
 
 
 def _row(alert_id, label, verdict="benign", confidence=0.9, rule="Proc Access"):
@@ -44,3 +44,21 @@ def test_other_rule_types_and_non_benign_verdicts_do_not_count():
 def test_no_benign_evidence_means_never_close_even_without_misses():
     rows = [_row("m", "malicious", verdict="malicious"), _row("x", "benign")]
     assert loo_thresholds(rows)["x"] is None
+
+
+# fit_thresholds: the production policy, fitted on every labelled alert (the eval uses LOO).
+
+def test_fit_uses_every_alert_of_the_rule_type():
+    rows = [_row("a", "benign", confidence=0.8), _row("b", "benign", confidence=0.95)]
+    assert fit_thresholds(rows) == {"Proc Access": 0.8}
+
+
+def test_fit_sits_above_every_missed_malicious_alert():
+    rows = [_row("a", "benign", confidence=0.8), _row("m", "malicious", confidence=0.85),
+            _row("b", "benign", confidence=0.95)]
+    assert 0.85 < fit_thresholds(rows)["Proc Access"] <= 0.85 + 1e-5
+
+
+def test_fit_leaves_out_rule_types_with_no_correct_benign_call():
+    rows = [_row("m", "malicious", verdict="malicious", rule="Net Conn"), _row("a", "benign")]
+    assert fit_thresholds(rows) == {"Proc Access": 0.9}

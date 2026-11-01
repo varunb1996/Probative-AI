@@ -1,0 +1,29 @@
+# Render Blueprint: one free web service runs the API and, as threads, the enrich and triage workers.
+# Secrets (sync: false) are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: probative-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn --factory triage.api.app:create_app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL          # Neon main branch
+        sync: false
+      - key: API_TOKEN             # demo token for accept/reject; Render generates one
+        generateValue: true
+      - key: RUN_WORKERS
+        value: "true"
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ALLOW_CLOUD           # OTRF data is public; every alert is tagged dataset=public
+        value: "true"

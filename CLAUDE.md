@@ -65,13 +65,17 @@ Off-schema output is a failure: retry once, then escalate. Never parse loosely.
 ## Commands
 
 ```
-pytest -q                         # tests
-lint-imports                      # module boundaries
-python -m eval.harness run        # eval report over labelled alerts
-docker compose up                 # full system (from Phase 4)
+pytest -q                                         # unit tests (offline)
+pytest -q -m integration                          # database tests, need TEST_DATABASE_URL (Neon test branch)
+lint-imports                                      # module boundaries
+python -m eval.harness run --provider groq        # eval report over labelled alerts
+python -m eval.harness stack --provider groq      # Phase 4 gate: replay through Postgres + workers
+uvicorn --factory triage.api.app:create_app       # full system locally (RUN_WORKERS=true for workers)
 ```
+
+Deployed as one Render web service (`render.yaml`) on Neon Postgres. No Redis, no Docker.
 
 ## Current phase
 
 <!-- Update by hand at the start of each phase. -->
-Phase: 3
+Phase: 4

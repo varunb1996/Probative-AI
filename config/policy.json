@@ -1,0 +1,7 @@
+{
+  "note": "Close thresholds per rule type, fitted on 35 labelled alerts from the recorded run in data/evals/openai_gpt-oss-20b. Rule types not listed can never close.",
+  "close_confidence": {
+    "Proc Access": 0.9,
+    "Raw Access Read": 0.9
+  }
+}

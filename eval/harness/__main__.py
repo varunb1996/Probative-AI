@@ -13,6 +13,7 @@ from pathlib import Path
 from eval.harness.dataset import load_labels, load_pairs
 from eval.harness.jsonl_source import NoIntel
 from eval.harness.run import run
+from eval.harness.stack import calibrate, seed, stack
 from triage.pipeline.context import build_bundle
 from triage.pipeline.enrich import enrich
 from triage.pipeline.noise import dedup, is_allowlisted, load_allowlist
@@ -102,9 +103,21 @@ def main() -> None:
     r.add_argument("--model", help="overrides OPENAI_MODEL")
     r.add_argument("--base-url", help="overrides OPENAI_BASE_URL")
     r.add_argument("--pause", type=float, default=3, help="seconds between model calls")
+    s = sub.add_parser("stack", help="Phase 4 gate: replay recorded results through Postgres and the workers")
+    s.add_argument("--provider", help="whose recorded results to replay (e.g. groq)")
+    c = sub.add_parser("calibrate", help="write config/policy.json from recorded results on all labels")
+    c.add_argument("--provider", help="whose recorded results to fit on (e.g. groq)")
+    d = sub.add_parser("seed", help="load the labelled alerts into DATABASE_URL, routed with recorded results")
+    d.add_argument("--provider", help="whose recorded results to replay (e.g. groq)")
     args = p.parse_args()
-    if args.command == "baseline":
+    if args.command == "seed":
+        print(f"seeded; newly queued: {seed(args.provider)}")
+    elif args.command == "baseline":
         baseline(args.allowlist, timedelta(minutes=args.dedup_minutes))
+    elif args.command == "stack":
+        raise SystemExit(1 if stack(args.provider) else 0)
+    elif args.command == "calibrate":
+        print(f"wrote {calibrate(args.provider)}")
     else:
         print(f"report: {run(args.model, args.base_url, args.pause, args.provider)}")
 

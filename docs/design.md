@@ -206,14 +206,14 @@ Every component is free; the only real cost is GPU time, which the demo sidestep
 | Detection | Hayabusa (Sigma rules over EVTX/JSON); Chainsaw as fallback | Reads Windows logs directly, ships Sigma support; verified on the Phase 0 dataset |
 | Domain contracts | Python, Pydantic models | One schema enforced at every boundary |
 | API and human gates | FastAPI | Queue views, accept/reject actions |
-| Queue | Redis Streams with consumer groups | Ack, replay, pending-entry recovery; Celery's task model adds nothing here |
-| State | Postgres, JSONB for evidence bundles | One store for alerts, verdicts, audit; no pgvector, since the design has no retrieval |
+| Queue | A Postgres queue table (lease, ack, reclaim on expiry, priority, `FOR UPDATE SKIP LOCKED`) | Same guarantees as Redis Streams with no extra service; Redis does not run on the build laptop (decision 2026-11-01) |
+| State | Postgres (Neon free tier), JSONB for evidence bundles | One store for alerts, verdicts, audit; no pgvector, since the design has no retrieval |
 | Threat intel | abuse.ch feeds synced to Postgres on a cron | Free, local, no per-lookup API limits |
 | Inference, dev | Ollama with a small instruct model | Runs on a laptop; fine for one alert at a time |
 | Inference, eval | vLLM on a free notebook GPU (Kaggle or Colab) | Batches the labelled set; schema-guided output |
 | Inference interface | One OpenAI-compatible client | Ollama and vLLM both expose it, so switching is config |
 | Eval | pytest plus a small harness writing results to Postgres | Every run comparable to the last |
-| Packaging | Docker Compose | One command brings up the whole system |
+| Packaging | One Render free web service: FastAPI plus the workers as threads (`render.yaml`) | A public link with no Docker; workers talk only through the queue, so they can move to their own services unchanged |
 
 Ceiling check: run one strong cloud model on the same public alerts. Allowed only because the data is public; the flag is enforced in code (next section).
 
@@ -264,7 +264,8 @@ Each tier scales on its own bottleneck because tiers talk only through streams; 
 
 - **At-least-once delivery, idempotent writes.** Streams may redeliver, so every write is an upsert keyed by alert ID.
 - **Backpressure by waiting.** Triage workers cap in-flight inference requests; excess alerts sit in the stream, never dropped. Pending-entry recovery reclaims messages from crashed workers.
-- **Priority lane.** Critical-asset alerts go to a separate stream that triage workers read first.
+- **Priority lane.** Critical-asset alerts are queued at a higher priority and claimed first.
+- **As deployed (2026-11-01).** The streams are rows in one Postgres queue table, and the workers run as threads in a single free web service. Scaling is therefore processes on one host, not separate machines; moving a worker to its own service needs configuration only.
 - **Same code, two shapes.** Pure step functions are called in-process in Architecture A and by stream consumers in B; the eval numbers must match exactly.
 
 **Unit economics, measured not guessed.** Once the first triage call works, record tokens per alert and the GPU's tokens per second under load. Sustainable incoming alerts per minute = (GPU tokens per minute ÷ tokens per alert) ÷ the share of alerts that survive noise filtering and reach the model. Put the measured figures in the README.
@@ -332,5 +333,7 @@ CLAUDE.md tells Claude Code the architecture; hooks and tests enforce it. Instru
 Other tool names (Chainsaw, Splunk BOTS, abuse.ch, vLLM, Ollama, import-linter) are from general knowledge; check each project's current docs before using it.
 
 ## Change log
+
+- 2026-11-01: Phase 4 stack. Redis Streams replaced by a Postgres queue table; Docker Compose replaced by one Render free web service (API plus worker threads); Postgres hosted on Neon. Reason: Redis does not run on the build laptop, and a free public link was wanted. The Phase 4 gate replays the recorded Phase 3c judge results through the stack: 0 route or score differences on the 35 labelled alerts.
 
 - 2026-10-31: After the Phase 0 null test (`docs/null-test-results.md`). Step 3's context bundle is now process-scoped (trigger event, same-process events, parent and children, that process's network events) instead of a host time window. Added verifier check 7, trigger anchoring: the verdict must cite the triggering event, else escalate. Reason: both false alarms cited neighbouring PowerShell events and not their own triggering event.
