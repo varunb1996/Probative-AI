@@ -32,6 +32,12 @@ Neither kill condition fired; the success bar (>= 50% closed at >= 95% recall) i
 Caveats: one lab scenario, 35 labels (30 Claude-proposed and human-reviewed), free-tier model limits.
 See [`docs/baseline.md`](docs/baseline.md) and the report's caveats.
 
+**The investigator** ([`eval/reports/investigator-20261101T102853Z.md`](eval/reports/investigator-20261101T102853Z.md)), on the
+6 alerts the triage call left as suspicious: recall 6/6 like escalating straight to a human, but it closed none
+and spent ~113k tokens, so on this data a human wins. The step logs say why: the process-scoped evidence already
+held what its first query found, the host timeline returns thousands of noisy events, and there is no
+threat-intel feed for lookups to hit. Next: cap events per query and connect a feed.
+
 ## Try it
 
 Live: **https://probative-ai.onrender.com** (free tier: the first visit after ~15 idle minutes takes about a minute).
