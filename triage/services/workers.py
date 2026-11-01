@@ -15,6 +15,7 @@ from collections.abc import Callable
 import psycopg
 
 from triage.domain import Alert, EvidenceBundle, EvidenceScore, IntelLookup, JudgeResult
+from triage.investigate.loop import Decide, run_investigation
 from triage.judge.client import ChatClient, CloudRefused, Completion, InferenceConfig, RateLimited
 from triage.judge.judge import judge
 from triage.pipeline.context import build_bundle
@@ -24,7 +25,7 @@ from triage.store import queue, repositories as repo
 from triage.store.db import connect
 from triage.store.event_source import PostgresEventSource
 from triage.verify.checks import VerifyPolicy, verify
-from triage.verify.router import Route, route
+from triage.verify.router import Route, route, route_investigation
 
 log = logging.getLogger("triage.workers")
 
@@ -110,6 +111,44 @@ def triage_step(conn: psycopg.Connection, msg: queue.Message, judge_fn: JudgeFn,
     return decision.route
 
 
+INVESTIGATIONS_PER_DAY = 5   # each can make up to 6 model calls; protects the free model allowance
+
+
+def investigate_step(conn: psycopg.Connection, msg: queue.Message, decide: Decide, policy_for: PolicyFn,
+                     daily_cap: int = INVESTIGATIONS_PER_DAY) -> Route:
+    """Run the bounded investigator on one alert routed to investigate, then re-route it.
+    Sandbox alerts and alerts past the daily cap go straight to a human."""
+    bundle = EvidenceBundle.model_validate(msg.payload["bundle"])
+    evidence = EvidenceScore.model_validate(msg.payload["score"])
+    alert_id = bundle.alert.alert_id
+    case_id = repo.alert_case(conn, alert_id)
+
+    if case_id is not None:
+        reason = "investigation not run in the sandbox; stays with the analyst"
+    elif repo.investigations_today(conn) >= daily_cap:
+        reason = "daily investigation budget used; stays with the analyst"
+    else:
+        reason = None
+    if reason:
+        repo.update_route(conn, alert_id, str(Route.ESCALATE), [reason])
+        repo.audit(conn, alert_id, "route", {"route": str(Route.ESCALATE), "reasons": [reason]}, case_id=case_id)
+        queue.ack(conn, msg.id)
+        return Route.ESCALATE
+
+    investigation = run_investigation(bundle, evidence, decide, PostgresEventSource(conn, case_id), NoIntel(),
+                                      policy_for(bundle.alert))
+    repo.upsert_investigation(conn, investigation)
+    repo.audit(conn, alert_id, "investigation", {"verified": investigation.verified,
+                                                 "stop_reason": investigation.stop_reason,
+                                                 "steps": investigation.state.step_count,
+                                                 "tokens_used": investigation.state.tokens_used}, case_id=case_id)
+    decision = route_investigation(investigation, repo.get_rule_mode(conn, bundle.alert.rule_title))
+    repo.update_route(conn, alert_id, str(decision.route), decision.reasons)
+    repo.audit(conn, alert_id, "route", decision.model_dump(mode="json"), case_id=case_id)
+    queue.ack(conn, msg.id)
+    return decision.route
+
+
 def run_once(conn: psycopg.Connection, stream: str, step: Callable[[queue.Message], object]) -> bool:
     """Claim and process one message. False when the stream had nothing ready."""
     batch = queue.claim(conn, stream)
@@ -134,7 +173,7 @@ def drain(conn: psycopg.Connection, judge_fn: JudgeFn, policy_for: PolicyFn,
 
 
 def start(url: str, judge_fn: JudgeFn, policy_for: PolicyFn, stop: threading.Event,
-          poll_seconds: float, gate: GateFn | None = None) -> list[threading.Thread]:
+          poll_seconds: float, gate: GateFn | None = None, decide: Decide | None = None) -> list[threading.Thread]:
     """One enrich thread and one triage thread, each with its own connection."""
     def loop(stream: str, make_step):
         with connect(url) as conn:
@@ -154,6 +193,9 @@ def start(url: str, judge_fn: JudgeFn, policy_for: PolicyFn, stop: threading.Eve
         threading.Thread(target=loop, name="triage", daemon=True,
                          args=(ENRICHED, lambda c: (lambda m: triage_step(c, m, judge_fn, policy_for, gate)))),
     ]
+    if decide is not None:
+        threads.append(threading.Thread(target=loop, name="investigate", daemon=True,
+                                        args=(INVESTIGATE, lambda c: (lambda m: investigate_step(c, m, decide, policy_for)))))
     for t in threads:
         t.start()
     return threads

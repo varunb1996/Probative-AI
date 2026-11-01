@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from triage.api import pages
 from triage.api.auth import token_ok
+from triage.investigate.decide import model_decide
 from triage.judge.client import OpenAICompatibleClient
 from triage.services import sandbox, workers
 from triage.services.config import Settings, inference_config, load_dotenv, load_policy
@@ -54,8 +55,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.run_workers:
             config = inference_config(os.environ)
             policy = load_policy(os.environ)
+            # The investigator's replies are a union (tool call | verdict); strict schema mode cannot express
+            # it on most providers, so it runs without response_format. Parsing stays strict either way.
+            plain = config.model_copy(update={"structured_output": False})
+            decide = model_decide(workers.PatientClient(OpenAICompatibleClient(plain)), plain)
             workers.start(settings.database_url, workers.model_judge(OpenAICompatibleClient(config), config),
-                          lambda alert: policy, stop, settings.poll_seconds, gate=sandbox.budget_gate)
+                          lambda alert: policy, stop, settings.poll_seconds, gate=sandbox.budget_gate, decide=decide)
             sandbox.start_case_worker(settings.database_url, stop, settings.poll_seconds)
         yield
         stop.set()
@@ -81,7 +86,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 (alert_id,)).fetchone()
         return jsonable_encoder({"alert": alert.model_dump(mode="json"), "verdict": repo.get_verdict(conn, alert_id),
                                  "decision": decision, "trigger_event": trigger.model_dump(mode="json"),
-                                 "case_id": repo.alert_case(conn, alert_id)})
+                                 "case_id": repo.alert_case(conn, alert_id),
+                                 "investigation": repo.get_investigation(conn, alert_id)})
 
     def client_of(request: Request) -> str:
         address, _ = sandbox.client_address(dict(request.headers), request.client.host if request.client else None)

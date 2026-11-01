@@ -107,3 +107,9 @@ alter table events add column if not exists case_id text;
 alter table alerts add column if not exists case_id text;
 create index if not exists events_case on events (case_id, host);
 create index if not exists alerts_case on alerts (case_id);
+
+create table if not exists investigations (
+    alert_id      text primary key references alerts (alert_id),
+    investigation jsonb not null,
+    at            timestamptz not null default now()
+);

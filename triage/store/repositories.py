@@ -6,7 +6,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from triage.domain import Alert, Event, JudgeResult, PriorAlert, RuleMode
+from triage.domain import Alert, Event, Investigation, JudgeResult, PriorAlert, RuleMode
 from triage.pipeline.process import actor_process, parent_process
 
 
@@ -80,6 +80,11 @@ def upsert_verdict(conn: psycopg.Connection, alert_id: str, result: JudgeResult,
         (alert_id, Jsonb(result.model_dump(mode="json")), Jsonb(score), Jsonb(report), route, Jsonb(reasons)))
 
 
+def update_route(conn: psycopg.Connection, alert_id: str, route: str, reasons: list[str]) -> None:
+    conn.execute("update verdicts set route = %s, reasons = %s, updated_at = now() where alert_id = %s",
+                 (route, Jsonb(reasons), alert_id))
+
+
 def get_verdict(conn: psycopg.Connection, alert_id: str) -> dict[str, Any] | None:
     return conn.execute("select * from verdicts where alert_id = %s", (alert_id,)).fetchone()
 
@@ -94,6 +99,24 @@ def list_by_route(conn: psycopg.Connection, routes: list[str], undecided_only: b
         "where v.route = any(%s) and (not %s or d.alert_id is null) and a.case_id is not distinct from %s "
         "order by a.ts desc",
         (routes, undecided_only, case_id)).fetchall()
+
+
+# --- investigations ---------------------------------------------------------
+
+def upsert_investigation(conn: psycopg.Connection, investigation: Investigation) -> None:
+    conn.execute("insert into investigations (alert_id, investigation) values (%s, %s) on conflict (alert_id) "
+                 "do update set investigation = excluded.investigation, at = now()",
+                 (investigation.alert_id, Jsonb(investigation.model_dump(mode="json"))))
+
+
+def get_investigation(conn: psycopg.Connection, alert_id: str) -> dict[str, Any] | None:
+    row = conn.execute("select investigation from investigations where alert_id = %s", (alert_id,)).fetchone()
+    return row["investigation"] if row else None
+
+
+def investigations_today(conn: psycopg.Connection) -> int:
+    return conn.execute("select count(*) as n from audit_log where kind = 'investigation' "
+                        "and at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'").fetchone()["n"]
 
 
 # --- human decisions and rule modes -----------------------------------------
@@ -177,6 +200,7 @@ def delete_case(conn: psycopg.Connection, case_id: str) -> None:
     with conn.transaction():
         conn.execute(f"delete from human_decisions where alert_id in ({alerts})", (case_id,))
         conn.execute(f"delete from verdicts where alert_id in ({alerts})", (case_id,))
+        conn.execute(f"delete from investigations where alert_id in ({alerts})", (case_id,))
         conn.execute(f"delete from queue where alert_id in ({alerts})", (case_id,))
         conn.execute("delete from alerts where case_id = %s", (case_id,))
         conn.execute("delete from events where case_id = %s", (case_id,))

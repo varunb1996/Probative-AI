@@ -328,12 +328,14 @@ def alert(detail: dict[str, Any]) -> str:
             for c in verdict["report"]["checks"])
         checks = f"<section class='panel' style='--i:1'><h3>Cross-examination · seven checks</h3><ul class='checks'>{items}</ul></section>"
 
+    investigation = _investigation_panel(detail.get("investigation"))
     rows = "".join(f"<tr><th>{escape(str(k))}</th><td>{escape(str(val)[:500])}</td></tr>"
                    for k, val in trigger["fields"].items() if k != "Message")
     evidence = (f"<section class='panel evidence'><h3>Exhibit A · triggering event "
                 f"<span class='mono'>{escape(trigger['event_id'])}</span></h3><div class='scroll'><table>{rows}</table></div></section>")
     script = _DECIDE_JS if "class='decide'" in finding else ""
-    return _page(f"{a['rule_title']} · Probative AI", head + f"<div class='exhibit'>{finding}{checks}</div>" + evidence, script)
+    return _page(f"{a['rule_title']} · Probative AI",
+                 head + f"<div class='exhibit'>{finding}{checks}</div>" + investigation + evidence, script)
 
 
 _TRY_JS = """
@@ -446,3 +448,30 @@ def _case_sections(rows: list[dict]) -> str:
                         f"<span>score {min(map(score, items)):g}–{max(map(score, items)):g}</span></summary>"
                         f"<ol>{links}</ol></details>")
     return "".join(html)
+
+
+def _investigation_panel(inv: dict | None) -> str:
+    """The bounded investigator's steps and how it ended."""
+    if not inv:
+        return ""
+    state = inv["state"]
+    steps = []
+    for n, q in enumerate(state["query_log"], 1):
+        args = ", ".join(f"{k}={v}" for k, v in q["arguments"].items())
+        if q.get("error"):
+            outcome = f"<span class='fail'>rejected: {escape(q['error'])}</span>"
+        else:
+            found = [f"+{len(q['result_event_ids'])} events"] + [escape(i) for i in q.get("intel", [])]
+            outcome = escape(", ".join(found))
+        steps.append(f"<li><b class='mono'>{n}. {escape(q['tool'])}</b>(<span class='mono'>{escape(args)}</span>) "
+                     f"<span class='muted'>→</span> {outcome}</li>")
+    v = (inv.get("result") or {}).get("verdict")
+    if inv["verified"] and v:
+        ending = (f"<p><b>Ended:</b> verified verdict, <b>{escape(v['verdict'])}</b> "
+                  f"(confidence {escape(str(v['confidence']))}).</p><blockquote>{escape(v['summary'])}</blockquote>")
+    else:
+        ending = (f"<p><b>Ended:</b> {escape(inv['stop_reason'])}. Handed to the analyst with this log; "
+                  "the investigator never closes an alert it could not verify.</p>")
+    return (f"<section class='panel evidence' style='--i:2'><h3>Investigation · {state['step_count']} steps · "
+            f"{state['tokens_used']:,} tokens · read-only tools</h3><ol class='checks'>{''.join(steps)}</ol>"
+            f"{ending}</section>")
