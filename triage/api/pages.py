@@ -12,7 +12,8 @@ FONTS = ("https://fonts.googleapis.com/css2?family=Gloock&family=Familjen+Grotes
          "&family=Martian+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;"
          "1,6..72,400&display=swap")
 ROUTE_LABEL = {"escalate": "Escalated", "investigate": "Investigate", "suggest_close": "Suggest close",
-               "auto_close": "Auto-closed"}
+               "auto_close": "Auto-closed", "scored_only": "Scored only"}
+_SKIPPED = "AI not run"
 CHECK_LABEL = {"schema": "Output matches the contract", "citation_grounding": "Every citation exists in the evidence",
                "hard_override": "No intel hit or critical host", "baseline_disagreement": "Agrees with the evidence score",
                "injection_tripwire": "No instructions hidden in the logs",
@@ -88,6 +89,7 @@ h2 .count { font: 500 13px var(--mono); color: var(--ink-soft); }
 @media (prefers-color-scheme: dark) { .stamp { mix-blend-mode: normal; } }
 .stamp.escalate { color: var(--escalate); } .stamp.investigate { color: var(--investigate); }
 .stamp.suggest_close, .stamp.auto_close { color: var(--close); }
+.stamp.scored_only { color: var(--ink-soft); }
 
 .exhibit { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; }
 .panel { background: var(--card); box-shadow: var(--shadow); padding: 26px 28px; position: relative;
@@ -163,6 +165,15 @@ footer { margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--ink); 
 .status.failed { color: var(--escalate); }
 .progress { height: 4px; background: var(--rule); margin-top: 12px; position: relative; }
 .progress i { position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--margin); transition: width .4s; }
+
+details.group { border-bottom: 1px solid var(--rule); padding: 12px 0; }
+details.group summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; list-style: none; }
+details.group summary::-webkit-details-marker { display: none; }
+details.group summary::before { content: "+"; font: 500 14px var(--mono); color: var(--margin); width: 14px; }
+details.group[open] summary::before { content: "2"; }
+details.group summary b { font: 600 18px var(--body); }
+details.group summary span { font: 400 12px var(--mono); color: var(--ink-soft); }
+details.group ol { margin: 10px 0 0 28px; padding: 0; font: 400 12px/1.9 var(--mono); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 @keyframes pulse { 50% { opacity: .25; } }
@@ -293,7 +304,13 @@ def alert(detail: dict[str, Any]) -> str:
                          f"<dl><dt>Cited</dt><dd class='mono'>{escape(', '.join(v['cited_event_ids']) or 'nothing')}</dd>"
                          f"<dt>Would settle it</dt><dd>{escape('; '.join(v['missing_context']) or 'nothing further asked')}</dd>")
         else:
-            parts.append(f"</div><blockquote>The judge returned no verdict: {escape(result.get('error') or 'unknown')}</blockquote><dl>")
+            error = result.get("error") or "unknown"
+            if error.startswith(_SKIPPED):
+                parts.append("</div><blockquote>Not reviewed by AI: only the highest-scoring alerts of a sandbox case are, "
+                             "to stay inside the free model budget. Without a verdict it stays with the analyst; "
+                             "it is never treated as safe.</blockquote><dl>")
+            else:
+                parts.append(f"</div><blockquote>The judge returned no verdict: {escape(error)}</blockquote><dl>")
         parts.append(f"<dt>Routed because</dt><dd>{escape(', '.join(verdict['reasons']) or '-')}</dd>"
                      f"<dt>Evidence score</dt><dd><b>{escape(str(verdict['score']['total']))}</b> "
                      f"<span class='tags'>{''.join(f'<span>{escape(s)}</span>' for s in verdict['score']['contributions'])}</span></dd>")
@@ -400,6 +417,32 @@ def case(case: dict, triaged: int, analyst_queue: list[dict], suggestions: list[
         "<a class='back' href='/try'>← Open another case</a>"
         f"<div class='kicker' style='margin-top:28px'>Case · {escape(case['source'])} · expires {escape(str(case['expires_at'])[:16])} UTC</div>"
         f"<h1 style='font-size:clamp(34px,5vw,58px)'>{escape(case['name'])}</h1>{line}"
-        f"<h2>Analyst queue <span class='count'>{len(analyst_queue)}</span></h2>{_docket(analyst_queue, 0)}"
-        f"<h2>Suggested closes <span class='count'>{len(suggestions)}</span></h2>{_docket(suggestions, len(analyst_queue))}")
+        + _case_sections(analyst_queue + suggestions))
     return _page(f"{case['name']} · Probative AI case", body, refresh=5 if working else None)
+
+
+def _skipped(row: dict) -> bool:
+    return ((row.get("judge_result") or {}).get("error") or "").startswith(_SKIPPED)
+
+
+def _case_sections(rows: list[dict]) -> str:
+    """The AI-reviewed alerts first (highest score first), then the rest grouped by rule."""
+    score = lambda r: float((r.get("score") or {}).get("total", 0))  # noqa: E731
+    reviewed = sorted((r for r in rows if not _skipped(r)), key=lambda r: (-score(r), str(r["ts"])))
+    skipped = [r for r in rows if _skipped(r)]
+    html = [f"<h2>Reviewed by AI <span class='count'>{len(reviewed)}</span></h2>", _docket(reviewed, 0)]
+    if skipped:
+        groups: dict[str, list[dict]] = {}
+        for r in sorted(skipped, key=lambda r: (-score(r), str(r["ts"]))):
+            groups.setdefault(r["rule_title"], []).append(r)
+        html.append(f"<h2>Scored only <span class='count'>{len(skipped)} not reviewed by AI</span></h2>"
+                    "<p class='lede'>AI not run on these: only the five highest-scoring alerts of a case get an AI "
+                    "verdict. Each was still scored by the deterministic pipeline, and without a verdict it stays "
+                    "with the analyst; it is never treated as safe.</p>")
+        for n, (rule, items) in enumerate(sorted(groups.items(), key=lambda kv: (-max(map(score, kv[1])), kv[0]))):
+            links = "".join(f"<li><a href='/alerts/{escape(r['alert_id'])}'>{escape(r['host'])} · "
+                            f"{escape(str(r['ts'])[:19])} · score {score(r):g}</a></li>" for r in items)
+            html.append(f"<details class='group'><summary>{_stamp('scored_only', n)}<b>{escape(rule)} × {len(items)}</b>"
+                        f"<span>score {min(map(score, items)):g}–{max(map(score, items)):g}</span></summary>"
+                        f"<ol>{links}</ol></details>")
+    return "".join(html)

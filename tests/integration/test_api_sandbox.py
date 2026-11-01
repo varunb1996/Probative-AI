@@ -133,3 +133,34 @@ def test_different_cloudflare_clients_get_separate_limits(client, monkeypatch):
     assert client.post("/api/cases/upload", content=_jsonl(), headers=a).status_code == 202
     assert client.post("/api/cases/upload", content=_jsonl(), headers=b).status_code == 202
     assert client.post("/api/cases/upload", content=_jsonl(), headers=a).status_code == 429
+
+
+def _ready_case_with_budget(conn, per_case):
+    case_id = sandbox.new_case_id()
+    repo.create_case(conn, case_id, "scenario", "golden", client="c", ttl=timedelta(hours=24))
+    raw = [json.loads((FIXTURES / f"{a}.json").read_text(encoding="utf-8"))["event"] for a in IDS]
+    dets = [json.loads((FIXTURES / "hayabusa" / f"{a}.json").read_text(encoding="utf-8")) for a in IDS]
+    sandbox.build_case(conn, case_id, raw, dets)
+    workers.drain(conn, lambda b, e: scripted({b.alert.alert_id: ("malicious", 0.9, [])})(b, e),
+                  lambda alert: POLICY, gate=lambda c, cid: sandbox.budget_gate(c, cid, per_case=per_case))
+    return case_id
+
+
+def test_case_page_puts_ai_reviewed_alerts_first_and_groups_the_rest(client, conn):
+    case_id = _ready_case_with_budget(conn, per_case=1)
+    page = client.get(f"/cases/{case_id}").text
+    reviewed, scored = page.index("Reviewed by AI"), page.index("Scored only")
+    assert reviewed < scored
+    top = conn.execute("select a.alert_id from verdicts v join alerts a on a.alert_id = v.alert_id "
+                       "where a.case_id = %s and jsonb_typeof(v.judge_result->'verdict') = 'object'", (case_id,)).fetchone()
+    assert reviewed < page.index(top["alert_id"]) < scored     # the judged alert sits in the AI section
+    assert "Proc Access" in page[scored:] and "×" in page[scored:]   # skipped alerts grouped by rule
+    assert "SCORED ONLY" in page.upper()[scored:]
+
+
+def test_skipped_alert_page_explains_the_budget_instead_of_a_failure(client, conn):
+    case_id = _ready_case_with_budget(conn, per_case=1)
+    skipped = conn.execute("select a.alert_id from verdicts v join alerts a on a.alert_id = v.alert_id "
+                           "where a.case_id = %s and jsonb_typeof(v.judge_result->'verdict') = 'null' limit 1", (case_id,)).fetchone()
+    page = client.get(f"/alerts/{skipped['alert_id']}").text
+    assert "Not reviewed by AI" in page and "returned no verdict" not in page
