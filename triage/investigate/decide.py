@@ -53,14 +53,40 @@ SYSTEM = (
 )
 
 
-def model_decide(client: ChatClient, config: InferenceConfig, budget: Budget = Budget()) -> Decide:
+SYSTEM_JSON = (
+    SYSTEM.replace("Gather evidence with the read-only query functions, one call per turn, then call "
+                   "submit_verdict", "Gather evidence with read-only queries, one per reply, then give a verdict")
+    + "\nQueries: process_tree {host, pid, guid}: the process, its parent and children; "
+    "network_connections {host, pid, guid}: that process's network events; host_timeline {host, start, end}: "
+    f"all events on the host, at most {int(WINDOW_CAP.total_seconds() // 60)} minutes; "
+    "entity_lookup {kind: hash|ip|domain, value}: threat intel.\n"
+    "Reply with exactly one JSON object and nothing else, with exactly the keys action, tool, args, verdict:\n"
+    '  to query: {"action": "tool", "tool": <query>, "args": {"host", "pid", "guid", "start", "end", "kind", '
+    '"value"} (null for fields the query does not take), "verdict": null}\n'
+    '  to finish: {"action": "verdict", "tool": null, "args": null, "verdict": {"alert_id", "verdict": '
+    '"benign"|"suspicious"|"malicious", "confidence": 0-1, "cited_event_ids", "summary", "missing_context"}}'
+)
+MODES = ("tools", "json")
+
+
+def model_decide(client: ChatClient, config: InferenceConfig, budget: Budget = Budget(),
+                 mode: str = "tools") -> Decide:
+    """`tools`: native function calling (preferred). `json`: one strict JSON object per reply, for models
+    without function calling. The loop, the queries and every check are the same in both."""
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}")
+
     def decide(bundle: EvidenceBundle, score: EvidenceScore, state: LoopState) -> Decision:
         check_allowed(config, [bundle.alert])
         messages, shown = _messages(bundle, score, state, budget)
+        if mode == "json":
+            messages[0] = {"role": "system", "content": SYSTEM_JSON}
         try:
-            completion = client.complete(messages, {}, tools=TOOL_SPECS)
+            completion = client.complete(messages, {}, tools=TOOL_SPECS if mode == "tools" else None)
         except InferenceError as e:
             raise ModelUnavailable(str(e)) from e
+        if mode == "json":
+            return _parse_json(completion.text, completion.tokens, bundle.alert.alert_id, shown)
         return _parse(completion.tool_call, completion.tokens, bundle.alert.alert_id, shown)
     return decide
 
@@ -92,13 +118,7 @@ def _parse(call: tuple[str, str] | None, tokens: int, alert_id: str, shown: list
         raise DecisionError("the model replied without a function call")
     name, arguments = call
     if name == "submit_verdict":
-        try:
-            verdict = Verdict.model_validate_json(arguments)
-        except ValidationError as e:
-            raise DecisionError(f"verdict is off the contract: {e.error_count()} errors") from e
-        if verdict.alert_id != alert_id:
-            raise DecisionError(f"verdict is for {verdict.alert_id!r}, not {alert_id!r}")
-        return Decision(verdict=verdict, tokens=tokens, shown_event_ids=shown)
+        return _verdict_decision(arguments, tokens, alert_id, shown)
     try:
         args = json.loads(arguments)
     except json.JSONDecodeError as e:
@@ -106,3 +126,33 @@ def _parse(call: tuple[str, str] | None, tokens: int, alert_id: str, shown: list
     if not isinstance(args, dict):
         raise DecisionError(f"arguments to {name} are not an object")
     return Decision(tool=name, args=args, tokens=tokens)
+
+
+def _verdict_decision(verdict_json: str, tokens: int, alert_id: str, shown: list[str]) -> Decision:
+    try:
+        verdict = Verdict.model_validate_json(verdict_json)
+    except ValidationError as e:
+        raise DecisionError(f"verdict is off the contract: {e.error_count()} errors") from e
+    if verdict.alert_id != alert_id:
+        raise DecisionError(f"verdict is for {verdict.alert_id!r}, not {alert_id!r}")
+    return Decision(verdict=verdict, tokens=tokens, shown_event_ids=shown)
+
+
+def _parse_json(text: str, tokens: int, alert_id: str, shown: list[str]) -> Decision:
+    """json mode: the whole reply must be one object with exactly action, tool, args and verdict."""
+    try:
+        body = json.loads(text.strip())
+    except json.JSONDecodeError as e:
+        raise DecisionError("reply is not a single JSON object") from e
+    if not isinstance(body, dict) or set(body) != {"action", "tool", "args", "verdict"}:
+        raise DecisionError('reply needs exactly the keys "action", "tool", "args" and "verdict"')
+    if body["action"] == "tool":
+        if not isinstance(body["tool"], str) or not isinstance(body["args"], dict) or body["verdict"] is not None:
+            raise DecisionError('a query needs "tool" and "args", and "verdict" null')
+        return Decision(tool=body["tool"], args={k: v for k, v in body["args"].items() if v is not None},
+                        tokens=tokens)
+    if body["action"] == "verdict":
+        if body["tool"] is not None or body["args"] is not None or not isinstance(body["verdict"], dict):
+            raise DecisionError('a verdict needs "verdict", and "tool" and "args" null')
+        return _verdict_decision(json.dumps(body["verdict"]), tokens, alert_id, shown)
+    raise DecisionError('"action" must be "tool" or "verdict"')

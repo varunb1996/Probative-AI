@@ -48,13 +48,16 @@ def compare(rows: list[Outcome]) -> dict[str, dict]:
     return {"Escalate to a human": metrics(set(), 0), "Investigator": metrics(closes, sum(r.tokens for r in rows))}
 
 
-def investigate(provider: str | None, pause: float, recorded_provider: str | None = None) -> Path:
+def investigate(provider: str | None, pause: float, recorded_provider: str | None = None,
+                mode: str = "tools") -> Path:
     """`provider` runs the investigator; `recorded_provider` (default: the same) names the recorded
     triage run whose routes select the alerts."""
     load_env()
     env = provider_env(os.environ, provider)
     config = InferenceConfig.from_env(env)
-    decide = model_decide(PatientClient(OpenAICompatibleClient(config), pause), config)
+    if mode == "json":   # replies are parsed strictly either way; free endpoints may not take a schema
+        config = config.model_copy(update={"structured_output": False})
+    decide = model_decide(PatientClient(OpenAICompatibleClient(config), pause), config, mode=mode)
     recorded = cache_dir(recorded_provider or provider)
     judge_fn = replay_judge(recorded)
     store = cache_dir(provider) / "investigations"
@@ -89,7 +92,7 @@ def investigate(provider: str | None, pause: float, recorded_provider: str | Non
         rows.append(Outcome(alert_id, label, str(decision.route), inv.state.tokens_used))
         invs[alert_id] = (inv, decision, labelled[alert_id][0].rule_title)
 
-    text = _render(rows, invs, config, recorded)
+    text = _render(rows, invs, config, recorded, mode)
     REPORTS.mkdir(parents=True, exist_ok=True)
     out = REPORTS / f"investigator-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.md"
     out.write_text(text, encoding="utf-8")
@@ -101,10 +104,10 @@ def _pct(x: float) -> str:
     return "n/a" if x != x else f"{x:.0%}"
 
 
-def _render(rows: list[Outcome], invs: dict, config: InferenceConfig, recorded: Path) -> str:
+def _render(rows: list[Outcome], invs: dict, config: InferenceConfig, recorded: Path, mode: str) -> str:
     table = compare(rows)
     lines = [f"# Investigator report: {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC", "",
-             f"Investigator model `{config.model}` at `{config.base_url}`. Alerts: the {len(rows)} labelled alerts "
+             f"Investigator model `{config.model}` at `{config.base_url}` ({mode} mode). Alerts: the {len(rows)} labelled alerts "
              f"the recorded triage run in `{recorded.as_posix()}` routed to investigate (suspicious, insufficient context). Read-only tools, at most 6 steps, "
              "the same verifier; shadow mode, so a close is a suggestion to a human.", "",
              "| Method | n | Malicious | Recall on malicious | Closed | Malicious among closes | Tokens |",
