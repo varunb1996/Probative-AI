@@ -164,3 +164,13 @@ def test_skipped_alert_page_explains_the_budget_instead_of_a_failure(client, con
                            "where a.case_id = %s and jsonb_typeof(v.judge_result->'verdict') = 'null' limit 1", (case_id,)).fetchone()
     page = client.get(f"/alerts/{skipped['alert_id']}").text
     assert "Not reviewed by AI" in page and "returned no verdict" not in page
+
+
+def test_home_tally_counts_only_the_demo_docket(client, conn):
+    pairs = golden_pairs()
+    ingest(conn, [e for _, e in pairs], pairs)
+    workers.drain(conn, scripted({a.alert_id: ("malicious", 0.9, []) for a, _ in pairs}), lambda alert: POLICY)
+    _ready_case_with_budget(conn, per_case=1)          # a sandbox case with its own verdicts
+    page = client.get("/").text
+    tally = page[page.index("class='tally'"):page.index("Analyst queue")]
+    assert f"<b>{len(pairs)}</b>" in tally             # the demo's escalations only

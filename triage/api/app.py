@@ -140,7 +140,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def home(conn: psycopg.Connection = Depends(get_conn)) -> str:
         counts = {r["route"]: r["n"] for r in conn.execute(
-            "select route, count(*) as n from verdicts group by route order by route").fetchall()}
+            "select v.route, count(*) as n from verdicts v join alerts a on a.alert_id = v.alert_id "
+            "where a.case_id is null group by v.route order by v.route").fetchall()}   # the demo, not sandbox cases
         return pages.home(counts, repo.list_by_route(conn, ANALYST_ROUTES), repo.list_by_route(conn, SUGGESTION_ROUTES))
 
     @app.get("/alerts/{alert_id}", response_class=HTMLResponse)
