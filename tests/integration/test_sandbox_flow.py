@@ -105,3 +105,19 @@ def test_process_upload_end_to_end(conn, tmp_path):
     c = repo.get_case(conn, case_id)
     assert c["status"] == "ready" and c["n_alerts"] >= len(IDS)
     assert not path.exists()     # uploads are deleted once parsed
+
+
+def test_sandbox_events_are_stored_without_the_message_field(conn, case):
+    rows = conn.execute("select fields from events where case_id = %s", (case,)).fetchall()
+    assert rows and all("Message" not in r["fields"] for r in rows)
+
+
+def test_a_case_that_crashed_once_is_failed_not_retried(conn, tmp_path):
+    case_id = sandbox.new_case_id()
+    repo.create_case(conn, case_id, "upload", "big.json", client="c", ttl=timedelta(hours=24))
+    path = tmp_path / "big.json"
+    path.write_text("{}", encoding="utf-8")
+    sandbox.run_case_message(conn, case_id, {"path": str(path), "format": "json"}, attempts=2)
+    c = repo.get_case(conn, case_id)
+    assert c["status"] == "failed" and "too large" in c["detail"]
+    assert not path.exists()

@@ -1,6 +1,7 @@
 """Sandbox pieces that need no database: EVTX conversion, formats, allow-list, ids, hashing."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -97,3 +98,21 @@ def test_client_hash_never_stores_the_address():
     h = sandbox.client_hash("203.0.113.9")
     assert "203.0.113.9" not in h and h == sandbox.client_hash("203.0.113.9")
     assert h != sandbox.client_hash("203.0.113.10")
+
+
+def test_hayabusa_only_loads_low_and_above_rules(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"] = cmd
+        Path(cmd[cmd.index("-o") + 1]).write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(sandbox.subprocess, "run", fake_run)
+    sandbox.run_hayabusa(tmp_path / "x.json", "json", binary=tmp_path / "hayabusa")
+    cmd = seen["cmd"]
+    assert cmd[cmd.index("-m") + 1] == "low"     # informational rules are never loaded: less memory
+
+
+def test_sandbox_scenarios_stay_small():
+    # The 43 MB Mimikatz recording is the main docket; it does not fit the free instance's memory as a case.
+    assert "empire_mimikatz_logonpasswords" not in sandbox.SCENARIOS

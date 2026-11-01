@@ -64,10 +64,6 @@ class Scenario:
 
 
 SCENARIOS = {
-    "empire_mimikatz_logonpasswords": Scenario(
-        "Mimikatz steals logged-on passwords",
-        "An Empire PowerShell agent runs Mimikatz sekurlsa::logonpasswords, reading credentials out of LSASS memory.",
-        _OTRF + "credential_access/host/empire_mimikatz_logonpasswords.zip"),
     "empire_launcher_vbs": Scenario(
         "Empire agent launched from a VBScript",
         "A VBScript launcher starts an Empire PowerShell agent that calls back to its server.",
@@ -189,7 +185,7 @@ def run_hayabusa(path: Path, fmt: str, binary: Path | None = None, timeout: int 
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "detections.jsonl"
         cmd = [str(binary), "dfir-timeline", "-f", str(path.resolve()), "-w", "-q", "-K", "-U",
-               "-t", "jsonl", "-p", "verbose", "-o", str(out), "-C"]
+               "-t", "jsonl", "-p", "verbose", "-m", "low", "-o", str(out), "-C"]
         if fmt == "json":
             cmd.insert(4, "-J")
         try:
@@ -236,6 +232,7 @@ def build_case(conn: psycopg.Connection, case_id: str, raw_events: list[dict], d
     events: list[Event] = []
     by_key: dict[tuple, Event] = {}
     for raw in raw_events:
+        raw.pop("Message", None)   # prose copy of the other fields; never read, doubles memory and storage
         e = parse_event(raw)
         e = e.model_copy(update={"event_id": case_event_id(case_id, e.event_id)})
         events.append(e)
@@ -269,8 +266,9 @@ def process_case(conn: psycopg.Connection, case_id: str, path: Path, fmt: str) -
     """Read, detect and build one case. Any failure is recorded on the case for the visitor."""
     repo.update_case(conn, case_id, status="processing")
     try:
+        detections = run_hayabusa(path, fmt)   # first, so its memory peak never overlaps the events'
         raw = read_evtx_events(path) if fmt == "evtx" else read_json_events(path)
-        build_case(conn, case_id, raw, run_hayabusa(path, fmt))
+        build_case(conn, case_id, raw, detections)
     except SandboxError as e:
         repo.update_case(conn, case_id, status="failed", detail=str(e))
     except Exception:   # noqa: BLE001 - logged and shown as a failed case; never a verdict
@@ -307,8 +305,18 @@ def enqueue_scenario(conn: psycopg.Connection, case_id: str, key: str) -> None:
     queue.enqueue(conn, CASES, case_id, {"scenario": key, "format": "json"})
 
 
-def run_case_message(conn: psycopg.Connection, case_id: str, payload: dict[str, Any]) -> None:
-    """A queued case: download its scenario if it has one, then process the file."""
+def run_case_message(conn: psycopg.Connection, case_id: str, payload: dict[str, Any], attempts: int = 1) -> None:
+    """A queued case: download its scenario if it has one, then process the file.
+
+    A second attempt means the first one died with the process (most likely out of memory),
+    so the case is failed rather than retried into the same crash.
+    """
+    if attempts > 1:
+        repo.update_case(conn, case_id, status="failed",
+                         detail="the file was too large for the sandbox's free server; try a smaller one")
+        if "path" in payload:
+            Path(payload["path"]).unlink(missing_ok=True)
+        return
     if "scenario" in payload:
         UPLOADS.mkdir(parents=True, exist_ok=True)
         repo.update_case(conn, case_id, status="processing", detail="downloading the scenario")
@@ -329,7 +337,7 @@ def start_case_worker(url: str, stop: threading.Event, poll_seconds: float) -> t
             while not stop.is_set():
                 batch = queue.claim(conn, CASES, lease=timedelta(minutes=15))
                 for msg in batch:
-                    run_case_message(conn, msg.alert_id, msg.payload)
+                    run_case_message(conn, msg.alert_id, msg.payload, msg.attempts)
                     queue.ack(conn, msg.id)
                 if not batch:
                     stop.wait(poll_seconds)
