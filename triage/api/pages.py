@@ -1,93 +1,281 @@
-"""Server-rendered analyst pages. Log text is hostile, so every value goes through escape()."""
+"""Server-rendered analyst pages, styled as an evidence docket.
+
+Log text is hostile: every dynamic value goes through escape(). The only script is the
+accept/reject form, which reads its alert id from a data attribute, never from markup.
+"""
 
 from html import escape
 from typing import Any
 
+REPO = "https://github.com/varunb1996/Probative-AI"
+FONTS = ("https://fonts.googleapis.com/css2?family=Gloock&family=Familjen+Grotesk:wght@400;600"
+         "&family=Martian+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;"
+         "1,6..72,400&display=swap")
+ROUTE_LABEL = {"escalate": "Escalated", "investigate": "Investigate", "suggest_close": "Suggest close",
+               "auto_close": "Auto-closed"}
+CHECK_LABEL = {"schema": "Output matches the contract", "citation_grounding": "Every citation exists in the evidence",
+               "hard_override": "No intel hit or critical host", "baseline_disagreement": "Agrees with the evidence score",
+               "injection_tripwire": "No instructions hidden in the logs",
+               "calibrated_confidence": "Confident enough for this rule type",
+               "trigger_anchoring": "Cites the triggering event"}
+
 _STYLE = """
-:root { --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --line: #ddd; --card: #fff; --bad: #b42318; --ok: #067647; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #111; --fg: #eee; --muted: #999; --line: #333; --card: #1a1a1a; --bad: #f97066; --ok: #47cd89; }
+:root {
+  --paper: #f2eadb; --paper-deep: #e7dcc6; --ink: #1d1813; --ink-soft: #5b5145; --rule: rgba(29,24,19,.09);
+  --margin: #9b2a1f; --escalate: #8f1d14; --investigate: #9a5b12; --close: #2c5b4e;
+  --card: rgba(255,251,242,.72); --shadow: 0 1px 0 rgba(29,24,19,.06), 0 12px 30px -18px rgba(29,24,19,.35);
+  --display: "Gloock", "Didot", serif; --body: "Newsreader", "Georgia", serif;
+  --label: "Familjen Grotesk", "Helvetica Neue", sans-serif; --mono: "Martian Mono", "Consolas", monospace;
 }
-body { font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 24px 16px; }
-main { max-width: 1100px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 28px 0 8px; }
-p.muted, .muted { color: var(--muted); }
-.cards { display: flex; gap: 12px; flex-wrap: wrap; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; min-width: 120px; }
-.card b { display: block; font-size: 22px; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #17130f; --paper-deep: #211b15; --ink: #efe6d6; --ink-soft: #a89a86; --rule: rgba(239,230,214,.07);
+    --margin: #c9473a; --escalate: #e0604f; --investigate: #e0a24a; --close: #6fb7a1;
+    --card: rgba(36,29,22,.78); --shadow: 0 1px 0 rgba(0,0,0,.4), 0 16px 34px -20px rgba(0,0,0,.8);
+  }
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0; color: var(--ink); font: 17px/1.55 var(--body); font-optical-sizing: auto;
+  background:
+    linear-gradient(90deg, transparent 0 calc(var(--gutter) - 4px), var(--margin) calc(var(--gutter) - 4px) calc(var(--gutter) - 3px),
+                    transparent calc(var(--gutter) - 3px) calc(var(--gutter) + 1px), var(--margin) calc(var(--gutter) + 1px) calc(var(--gutter) + 2px), transparent 0),
+    repeating-linear-gradient(180deg, transparent 0 31px, var(--rule) 31px 32px),
+    radial-gradient(120% 80% at 85% -10%, var(--paper-deep), transparent 60%),
+    var(--paper);
+  background-attachment: fixed; min-height: 100vh; --gutter: 56px;
+}
+a { color: inherit; text-decoration-color: var(--margin); text-underline-offset: 3px; }
+main { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px calc(var(--gutter) + 32px); }
+.kicker { font: 600 12px/1 var(--label); letter-spacing: .22em; text-transform: uppercase; color: var(--margin); }
+h1 { font: 400 clamp(44px, 7vw, 86px)/.92 var(--display); letter-spacing: -.02em; margin: 14px 0 18px; }
+h1 em { font-style: normal; color: var(--margin); }
+h2 { font: 400 30px/1.1 var(--display); margin: 56px 0 6px; display: flex; align-items: baseline; gap: 14px; }
+h2 .count { font: 500 13px var(--mono); color: var(--ink-soft); }
+.lede { max-width: 62ch; color: var(--ink-soft); font-size: 18px; margin: 0; }
+.lede code, .mono { font-family: var(--mono); font-size: .78em; }
+.procedure { margin: 26px 0 0; font: 400 12px/1.9 var(--mono); color: var(--ink-soft); letter-spacing: .02em; }
+.procedure b { color: var(--ink); font-weight: 500; }
+.procedure .model { color: var(--margin); }
+
+.tally { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; margin-top: 40px;
+         border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.tally div { padding: 14px 18px 16px 0; }
+.tally div + div { padding-left: 18px; border-left: 1px solid var(--rule); }
+.tally b { display: block; font: 400 54px/1 var(--display); }
+.tally span { font: 600 11px var(--label); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft); }
+.tally .escalate b { color: var(--escalate); } .tally .investigate b { color: var(--investigate); }
+.tally .suggest_close b, .tally .auto_close b { color: var(--close); }
+
+.docket { list-style: none; margin: 14px 0 0; padding: 0; counter-reset: entry; }
+.entry { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 6px 18px; align-items: center;
+         padding: 16px 18px 16px 0; border-bottom: 1px solid var(--rule); position: relative;
+         animation: rise .55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 45ms + 120ms); }
+.entry::before { counter-increment: entry; content: "No." counter(entry, decimal-leading-zero);
+                 font: 500 11px var(--mono); color: var(--ink-soft); align-self: start; padding-top: 6px; }
+.entry:hover { background: linear-gradient(90deg, var(--card), transparent); }
+.entry .title { font: 600 19px/1.25 var(--body); }
+.entry .title a { text-decoration: none; } .entry .title a:hover { text-decoration: underline; }
+.entry .meta { grid-column: 2; font: 400 12px/1.6 var(--mono); color: var(--ink-soft); word-break: break-all; }
+.entry .why { grid-column: 2 / 4; font: italic 15px/1.4 var(--body); color: var(--ink-soft); }
+.empty { font-style: italic; color: var(--ink-soft); padding: 18px 0; }
+
+.stamp { font: 600 11px/1 var(--label); letter-spacing: .2em; text-transform: uppercase; white-space: nowrap;
+         padding: 7px 10px 6px; border: 2px solid currentColor; border-radius: 3px; transform: rotate(-4deg);
+         mix-blend-mode: multiply; opacity: .92; animation: stamp .42s cubic-bezier(.3,1.6,.5,1) both;
+         animation-delay: calc(var(--i, 0) * 45ms + 380ms); box-shadow: inset 0 0 0 1px currentColor; }
+@media (prefers-color-scheme: dark) { .stamp { mix-blend-mode: normal; } }
+.stamp.escalate { color: var(--escalate); } .stamp.investigate { color: var(--investigate); }
+.stamp.suggest_close, .stamp.auto_close { color: var(--close); }
+
+.exhibit { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; }
+.panel { background: var(--card); box-shadow: var(--shadow); padding: 26px 28px; position: relative;
+         animation: rise .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 90ms + 150ms); }
+.panel h3 { margin: 0 0 14px; font: 600 11px var(--label); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft); }
+.finding { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+.finding .verdict { font: 400 40px/1 var(--display); text-transform: capitalize; }
+.gauge { flex: 1; min-width: 160px; }
+.gauge i { display: block; height: 4px; background: var(--rule); position: relative; overflow: hidden; }
+.gauge i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--ink);
+                  animation: fill 1s .5s cubic-bezier(.2,.7,.2,1) both; }
+.gauge small { font: 400 11px var(--mono); color: var(--ink-soft); }
+blockquote { margin: 0 0 18px; padding: 0 0 0 22px; border-left: 2px solid var(--margin);
+             font: italic 400 21px/1.45 var(--body); position: relative; }
+blockquote::before { content: "\\201C"; position: absolute; left: -6px; top: -26px; font: 400 64px var(--display); color: var(--margin); opacity: .35; }
+dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 15px; }
+dt { font: 600 11px/1.9 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+dd { margin: 0; word-break: break-word; }
+.checks { list-style: none; margin: 0; padding: 0; }
+.checks li { display: grid; grid-template-columns: 26px 1fr; padding: 7px 0; border-bottom: 1px dashed var(--rule); font-size: 15px; }
+.checks li::before { font: 500 14px var(--mono); }
+.checks .pass::before { content: "\\2713"; color: var(--close); }
+.checks .fail::before { content: "\\2717"; color: var(--escalate); }
+.checks .fail { color: var(--escalate); }
+.checks small { grid-column: 2; font: 400 11px var(--mono); color: var(--ink-soft); word-break: break-all; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tags span { font: 400 11px var(--mono); padding: 3px 8px; border: 1px solid var(--rule); background: var(--paper); }
+.evidence { margin-top: 40px; --i: 3; }
+.evidence table { width: 100%; border-collapse: collapse; font: 400 12px/1.55 var(--mono); }
+.evidence th { text-align: left; font-weight: 500; color: var(--ink-soft); padding: 6px 16px 6px 0; vertical-align: top; width: 1%; white-space: nowrap; }
+.evidence td { padding: 6px 0; word-break: break-all; }
+.evidence tr + tr { border-top: 1px solid var(--rule); }
 .scroll { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; background: var(--card); }
-th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
-th { font-weight: 600; } code { font-size: 13px; word-break: break-all; }
-.escalate, .investigate { color: var(--bad); } .suggest_close, .auto_close { color: var(--ok); }
-a { color: inherit; }
+.decide { margin-top: 18px; display: grid; gap: 10px; }
+.decide input { font: 400 13px var(--mono); padding: 9px 10px; background: var(--paper); color: var(--ink); border: 1px solid var(--ink-soft); }
+.decide .buttons { display: flex; gap: 10px; }
+.decide button { flex: 1; font: 600 12px var(--label); letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
+                 padding: 11px; border: 2px solid currentColor; background: transparent; transition: transform .15s, background .15s; }
+.decide button:hover { transform: translateY(-1px); }
+.decide .accept { color: var(--close); } .decide .reject { color: var(--escalate); }
+.decide output { font: italic 14px var(--body); color: var(--ink-soft); min-height: 1.4em; }
+footer { margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--ink); font: 400 12px/1.7 var(--mono); color: var(--ink-soft);
+         display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.back { font: 600 12px var(--label); letter-spacing: .18em; text-transform: uppercase; text-decoration: none; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes stamp { 0% { opacity: 0; transform: rotate(-14deg) scale(1.9); } 70% { opacity: .92; } 100% { transform: rotate(-4deg) scale(1); } }
+@keyframes fill { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 760px) {
+  body { --gutter: 18px; font-size: 16px; }
+  main { padding: 28px 16px 60px 34px; }
+  .entry { grid-template-columns: minmax(0, 1fr) auto; padding-right: 0; }
+  .entry::before { grid-column: 1 / -1; padding: 0; }
+  .entry .meta { grid-column: 1; } .entry .why { grid-column: 1 / -1; }
+  .exhibit { grid-template-columns: 1fr; gap: 24px; }
+  .panel { padding: 20px; }
+}
+"""
+
+_DECIDE_JS = """
+document.querySelectorAll('form.decide').forEach(function (form) {
+  form.addEventListener('submit', function (e) { e.preventDefault(); });
+  form.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var out = form.querySelector('output');
+      out.textContent = 'Recording…';
+      fetch('/api/alerts/' + encodeURIComponent(form.dataset.alert) + '/decision', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + form.token.value},
+        body: JSON.stringify({decision: btn.value, analyst: form.analyst.value || 'analyst'})
+      }).then(function (r) {
+        if (r.ok) { location.reload(); return; }
+        out.textContent = r.status === 401 ? 'That token was not accepted.' :
+                          r.status === 503 ? 'Decisions are switched off on this deployment.' :
+                          'Not recorded (HTTP ' + r.status + ').';
+      }).catch(function () { out.textContent = 'Could not reach the server.'; });
+    });
+  });
+});
 """
 
 
-def _page(title: str, body: str) -> str:
-    return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-            f"<meta name='viewport' content='width=device-width, initial-scale=1'>"
-            f"<title>{escape(title)}</title><style>{_STYLE}</style></head><body><main>{body}</main></body></html>")
+def _page(title: str, body: str, script: str = "") -> str:
+    tail = f"<script>{script}</script>" if script else ""
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            f"<title>{escape(title)}</title><link rel='preconnect' href='https://fonts.googleapis.com'>"
+            f"<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin><link rel='stylesheet' href='{FONTS}'>"
+            f"<style>{_STYLE}</style></head><body><main>{body}{_footer()}</main>{tail}</body></html>")
 
 
-def _rows_table(rows: list[dict[str, Any]]) -> str:
+def _footer() -> str:
+    return (f"<footer><span>Probative AI · the model proposes, code decides</span>"
+            f"<span><a href='{REPO}'>source</a> · <a href='/health'>health</a> · <a href='/api/queue'>json</a></span></footer>")
+
+
+def _stamp(route: str, i: int = 0) -> str:
+    return f"<span class='stamp {escape(route)}' style='--i:{i}'>{escape(ROUTE_LABEL.get(route, route))}</span>"
+
+
+def _docket(rows: list[dict[str, Any]], offset: int) -> str:
     if not rows:
-        return "<p class='muted'>Nothing here.</p>"
-    lines = ["<div class='scroll'><table><tr><th>Alert</th><th>Rule</th><th>Host</th><th>Time</th>"
-             "<th>Route</th><th>Why</th></tr>"]
-    for r in rows:
+        return "<p class='empty'>No entries on this docket.</p>"
+    items = []
+    for n, r in enumerate(rows):
+        i = n + offset
         alert_id = escape(r["alert_id"])
-        lines.append(
-            f"<tr><td><a href='/alerts/{alert_id}'><code>{alert_id}</code></a></td>"
-            f"<td>{escape(r['rule_title'])}</td><td>{escape(r['host'])}</td><td>{escape(str(r['ts']))}</td>"
-            f"<td class='{escape(r['route'])}'>{escape(r['route'])}</td>"
-            f"<td>{escape(', '.join(r['reasons']))}</td></tr>")
-    lines.append("</table></div>")
-    return "".join(lines)
+        reasons = ", ".join(r["reasons"])
+        items.append(
+            f"<li class='entry' style='--i:{i}'>"
+            f"<div class='title'><a href='/alerts/{alert_id}'>{escape(r['rule_title'])}</a></div>"
+            f"{_stamp(r['route'], i)}"
+            f"<div class='meta'>{alert_id} · {escape(r['host'])} · {escape(str(r['ts'])[:19])}</div>"
+            + (f"<div class='why'>{escape(reasons)}</div>" if reasons else "") + "</li>")
+    return f"<ol class='docket'>{''.join(items)}</ol>"
 
 
 def home(counts: dict[str, int], analyst_queue: list[dict], suggestions: list[dict]) -> str:
-    cards = "".join(f"<div class='card'><b>{n}</b>{escape(name)}</div>" for name, n in counts.items())
-    return _page("Probative AI", (
-        "<h1>Probative AI</h1>"
-        "<p class='muted'>Tier-1 alert triage: a deterministic pipeline, one LLM judgment, and a code-owned "
-        "verifier. Data: public OTRF <code>empire_mimikatz_logonpasswords</code>. Shadow mode: nothing is "
-        "closed without a human. Decisions need the demo API token.</p>"
-        f"<div class='cards'>{cards}</div>"
-        f"<h2>Analyst queue ({len(analyst_queue)})</h2>{_rows_table(analyst_queue)}"
-        f"<h2>Suggested closes ({len(suggestions)})</h2>{_rows_table(suggestions)}"))
+    order = ["escalate", "investigate", "suggest_close", "auto_close"]
+    tally = "".join(f"<div class='{escape(route)}'><b>{counts.get(route, 0)}</b><span>{escape(ROUTE_LABEL[route])}</span></div>"
+                    for route in order if route in counts or route != "auto_close")
+    body = (
+        "<div class='kicker'>Tier-1 alert docket · public OTRF data · shadow mode</div>"
+        "<h1>Probative <em>AI</em></h1>"
+        "<p class='lede'>Every alert is read by a deterministic pipeline, judged once by a language model that may only "
+        "<i>propose</i>, then cross-examined by seven checks in code. Nothing closes without a human. "
+        "Scenario: <code>empire_mimikatz_logonpasswords</code>.</p>"
+        "<p class='procedure'><b>detect</b> → parse → noise → process-scoped context → enrich → "
+        "<b>evidence score</b> → <span class='model'>one LLM judgment</span> → <b>verifier</b> → route → human</p>"
+        f"<div class='tally'>{tally}</div>"
+        f"<h2>Analyst queue <span class='count'>{len(analyst_queue)} open</span></h2>{_docket(analyst_queue, 0)}"
+        f"<h2>Suggested closes <span class='count'>{len(suggestions)} awaiting a human</span></h2>"
+        f"{_docket(suggestions, len(analyst_queue))}")
+    return _page("Probative AI · alert docket", body)
+
+
+def _decide_form(alert_id: str) -> str:
+    return (f"<form class='decide' data-alert='{escape(alert_id)}'>"
+            "<input name='analyst' placeholder='your name' maxlength='100' autocomplete='name'>"
+            "<input name='token' type='password' placeholder='demo API token' autocomplete='off'>"
+            "<div class='buttons'><button class='accept' value='accept'>Accept close</button>"
+            "<button class='reject' value='reject'>Reject</button></div><output></output></form>")
 
 
 def alert(detail: dict[str, Any]) -> str:
     a, verdict, trigger = detail["alert"], detail["verdict"], detail["trigger_event"]
-    parts = [f"<p><a href='/'>&larr; queues</a></p><h1>{escape(a['rule_title'])}</h1>",
-             f"<p class='muted'><code>{escape(a['alert_id'])}</code> · {escape(a['host'])} · "
-             f"{escape(a['timestamp'])} · level {escape(a['rule_level'])}</p>"]
-    if verdict:
-        result = verdict["judge_result"]
-        v = result.get("verdict")
-        failed = [c["name"] for c in verdict["report"]["checks"] if not c["passed"]]
-        parts.append(
-            f"<h2>Route: <span class='{escape(verdict['route'])}'>{escape(verdict['route'])}</span></h2>"
-            f"<p>{escape(', '.join(verdict['reasons']))}</p>")
-        if v:
-            parts.append(
-                f"<p><b>Model verdict:</b> {escape(v['verdict'])} (confidence {escape(str(v['confidence']))})"
-                f"<br>{escape(v['summary'])}</p>"
-                f"<p><b>Cited:</b> {escape(', '.join(v['cited_event_ids']))}</p>"
-                f"<p><b>Missing context:</b> {escape('; '.join(v['missing_context']) or 'none')}</p>")
-        else:
-            parts.append(f"<p><b>Judge failed:</b> {escape(result.get('error') or '')}</p>")
-        parts.append(f"<p><b>Failed checks:</b> {escape(', '.join(failed) or 'none')}</p>"
-                     f"<p><b>Evidence score:</b> {escape(str(verdict['score']['total']))} "
-                     f"({escape(', '.join(verdict['score']['contributions']))})</p>")
+    head = (f"<a class='back' href='/'>← Docket</a>"
+            f"<div class='kicker' style='margin-top:28px'>Exhibit · {escape(a['alert_id'])}</div>"
+            f"<h1 style='font-size:clamp(34px,5vw,58px)'>{escape(a['rule_title'])}</h1>"
+            f"<p class='lede mono'>{escape(a['host'])} · {escape(a['timestamp'])} · level {escape(a['rule_level'])}"
+            + (f" · user {escape(a['user'])}" if a.get("user") else "") + "</p>")
+
+    if not verdict:
+        finding = "<section class='panel'><h3>Finding</h3><p class='empty'>Not yet triaged.</p></section>"
+        checks = ""
     else:
-        parts.append("<p class='muted'>Not triaged yet.</p>")
-    if detail.get("decision"):
-        d = detail["decision"]
-        parts.append(f"<p><b>Human decision:</b> {escape(d['decision'])} by {escape(d['analyst'])}</p>")
-    fields = "".join(f"<tr><th>{escape(str(k))}</th><td><code>{escape(str(val)[:500])}</code></td></tr>"
-                     for k, val in trigger["fields"].items())
-    parts.append(f"<h2>Triggering event <code>{escape(trigger['event_id'])}</code></h2>"
-                 f"<div class='scroll'><table>{fields}</table></div>")
-    return _page(f"{a['rule_title']} · Probative AI", "".join(parts))
+        result, v = verdict["judge_result"], verdict["judge_result"].get("verdict")
+        parts = [f"<section class='panel' style='--i:0'><h3>Finding</h3><div class='finding'>{_stamp(verdict['route'])}"]
+        if v:
+            parts.append(f"<span class='verdict'>{escape(v['verdict'])}</span>"
+                         f"<div class='gauge'><i style='--v:{float(v['confidence']) * 100:.0f}%'></i>"
+                         f"<small>model confidence {escape(str(v['confidence']))}</small></div></div>"
+                         f"<blockquote>{escape(v['summary'])}</blockquote>"
+                         f"<dl><dt>Cited</dt><dd class='mono'>{escape(', '.join(v['cited_event_ids']) or 'nothing')}</dd>"
+                         f"<dt>Would settle it</dt><dd>{escape('; '.join(v['missing_context']) or 'nothing further asked')}</dd>")
+        else:
+            parts.append(f"</div><blockquote>The judge returned no verdict: {escape(result.get('error') or 'unknown')}</blockquote><dl>")
+        parts.append(f"<dt>Routed because</dt><dd>{escape(', '.join(verdict['reasons']) or '-')}</dd>"
+                     f"<dt>Evidence score</dt><dd><b>{escape(str(verdict['score']['total']))}</b> "
+                     f"<span class='tags'>{''.join(f'<span>{escape(s)}</span>' for s in verdict['score']['contributions'])}</span></dd>")
+        if detail.get("decision"):
+            d = detail["decision"]
+            parts.append(f"<dt>Human decision</dt><dd>{escape(d['decision'])} by {escape(d['analyst'])}</dd>")
+        parts.append("</dl>")
+        if verdict["route"] == "suggest_close" and not detail.get("decision"):
+            parts.append(_decide_form(a["alert_id"]))
+        parts.append("</section>")
+        finding = "".join(parts)
+        items = "".join(
+            f"<li class='{'pass' if c['passed'] else 'fail'}'>{escape(CHECK_LABEL.get(c['name'], c['name']))}"
+            + (f"<small>{escape(c['detail'])}</small>" if c.get("detail") and not c["passed"] else "") + "</li>"
+            for c in verdict["report"]["checks"])
+        checks = f"<section class='panel' style='--i:1'><h3>Cross-examination · seven checks</h3><ul class='checks'>{items}</ul></section>"
+
+    rows = "".join(f"<tr><th>{escape(str(k))}</th><td>{escape(str(val)[:500])}</td></tr>"
+                   for k, val in trigger["fields"].items() if k != "Message")
+    evidence = (f"<section class='panel evidence'><h3>Exhibit A · triggering event "
+                f"<span class='mono'>{escape(trigger['event_id'])}</span></h3><div class='scroll'><table>{rows}</table></div></section>")
+    script = _DECIDE_JS if "class='decide'" in finding else ""
+    return _page(f"{a['rule_title']} · Probative AI", head + f"<div class='exhibit'>{finding}{checks}</div>" + evidence, script)
