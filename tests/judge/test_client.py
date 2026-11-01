@@ -70,3 +70,11 @@ def test_other_http_errors_are_plain_inference_errors(monkeypatch):
     with pytest.raises(InferenceError) as info:
         OpenAICompatibleClient(CLOUD).complete([], {})
     assert not isinstance(info.value, RateLimited)
+
+
+def test_json_mode_sends_json_object_without_a_schema(monkeypatch):
+    sent = []
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", _capture(sent))
+    config = CLOUD.model_copy(update={"structured_output": False, "json_mode": True})
+    OpenAICompatibleClient(config).complete([], {})
+    assert sent[0]["response_format"] == {"type": "json_object"}

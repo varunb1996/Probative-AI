@@ -15,7 +15,7 @@ from triage.investigate.tools import WINDOW_CAP
 from triage.judge.client import ChatClient, InferenceConfig, InferenceError, check_allowed
 from triage.judge.sanitise import clean, render_event
 
-SHOWN_RECENT = 20    # the trigger plus the most recently gathered events
+SHOWN_RECENT = 8     # plus the trigger; keeps a prompt near 5k tokens (20 measured ~11k, over Groq's 8k cap)
 
 SYSTEM = (
     "You are a Tier-1 SOC analyst investigating one alert that was judged suspicious with insufficient "

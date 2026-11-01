@@ -39,6 +39,15 @@ Live: **https://probative-ai.onrender.com** (free tier: the first visit after ~1
   what tags the data `dataset=public` and so allows the cloud model. Limits: 3 cases per hour per visitor, 30 AI
   verdicts per day site-wide.
 
+## The investigator
+
+Alerts the triage call marks *suspicious, insufficient context* go to a bounded, read-only investigator:
+`process_tree`, `network_connections`, `host_timeline` (at most 15 minutes) and `entity_lookup`, with every
+argument checked in code and no free-text queries. It runs at most 6 steps, and each must add new evidence. It ends
+in a verdict the same verifier accepts, or hands the alert to a human with its full step log, which the alert's
+page shows. On the live site it investigates demo alerts only, at most 5 a day (free model budget).
+`python -m eval.harness investigate --provider groq` compares it with escalating straight to a human.
+
 ## Architecture as deployed
 
 - **Postgres (Neon)** holds events, alerts, verdicts, human decisions, rule modes and an append-only audit log.

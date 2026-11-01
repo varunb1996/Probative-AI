@@ -52,7 +52,7 @@ def investigate(provider: str | None, pause: float) -> Path:
     load_env()
     env = provider_env(os.environ, provider)
     config = InferenceConfig.from_env(env)
-    plain = config.model_copy(update={"structured_output": False})
+    plain = config.model_copy(update={"structured_output": False, "json_mode": True})
     decide = model_decide(PatientClient(OpenAICompatibleClient(plain), pause), plain)
     recorded = cache_dir(provider)
     judge_fn = replay_judge(recorded)

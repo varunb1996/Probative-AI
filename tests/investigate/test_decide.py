@@ -6,7 +6,7 @@ import pytest
 from investigate_support import ATTACKER, all_events, start_bundle
 
 from triage.domain import LoopState, QueryRecord
-from triage.investigate.decide import model_decide
+from triage.investigate.decide import SHOWN_RECENT, model_decide
 from triage.investigate.loop import DecisionError
 from triage.judge.client import CloudRefused, Completion, InferenceConfig
 from triage.pipeline.score import score
@@ -106,3 +106,13 @@ def test_newly_gathered_events_are_shown_to_the_model():
     d, client = _decide({"action": "tool", "tool": "process_tree", "args": ATTACKER}, bundle)
     text = client.calls[0][-1]["content"]
     assert all(e.event_id in text for e in gathered)
+
+
+def test_the_prompt_stays_small_enough_for_free_tier_token_caps():
+    assert SHOWN_RECENT <= 8     # measured: 20 gathered events made an ~11k-token prompt; Groq's cap was 8k
+
+
+def test_the_prompt_never_mentions_function_calling_words_that_trigger_native_tool_calls():
+    _, client = _decide({"action": "tool", "tool": "process_tree", "args": ATTACKER})
+    system = client.calls[0][0]["content"].lower()
+    assert "json" in system and "function" not in system

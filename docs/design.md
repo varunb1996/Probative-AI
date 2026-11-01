@@ -334,6 +334,8 @@ Other tool names (Chainsaw, Splunk BOTS, abuse.ch, vLLM, Ollama, import-linter) 
 
 ## Change log
 
+- 2026-11-01: Phase 5 investigator built as specified (read-only tools with code-checked arguments, 6-step cap, token budget, no-progress rule, one retry per malformed call, same verifier). Its outcome never routes back into investigation. On the free deployment it runs for demo alerts only, at most 5 per day; sandbox alerts routed to investigate go to the analyst.
+
 - 2026-11-01: Try-it sandbox on the public site. Visitors triage a public OTRF scenario or their own .evtx/JSON upload. For uploads, `dataset=public` (which allows the cloud model) now comes from the uploader's explicit "no private data" declaration rather than from known provenance; the page warns against company or personal logs. Only the 5 highest-scoring alerts per case reach the LLM (free-tier budget); the rest escalate as "AI not run". Cases and their events are deleted after 24 h.
 
 - 2026-11-01: Phase 4 stack. Redis Streams replaced by a Postgres queue table; Docker Compose replaced by one Render free web service (API plus worker threads); Postgres hosted on Neon. Reason: Redis does not run on the build laptop, and a free public link was wanted. The Phase 4 gate replays the recorded Phase 3c judge results through the stack: 0 route or score differences on the 35 labelled alerts.

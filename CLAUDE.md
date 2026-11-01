@@ -72,6 +72,7 @@ pytest -q -m integration                          # database tests, need TEST_DA
 lint-imports                                      # module boundaries
 python -m eval.harness run --provider groq        # eval report over labelled alerts
 python -m eval.harness stack --provider groq      # Phase 4 gate: replay through Postgres + workers
+python -m eval.harness investigate --provider groq  # Phase 5 gate: investigator vs escalate-to-human
 uvicorn --factory triage.api.app:create_app       # full system locally (RUN_WORKERS=true for workers)
 ```
 
@@ -80,4 +81,4 @@ Deployed as one Render web service (`render.yaml`) on Neon Postgres. No Redis, n
 ## Current phase
 
 <!-- Update by hand at the start of each phase. -->
-Phase: 4
+Phase: 5

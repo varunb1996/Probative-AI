@@ -42,6 +42,7 @@ class InferenceConfig(BaseModel):
     allow_cloud: bool = False
     timeout: float = 120.0
     structured_output: bool = True   # send the Verdict JSON schema as response_format
+    json_mode: bool = False          # without a schema: ask for any JSON object (response_format json_object)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "InferenceConfig":
@@ -85,6 +86,8 @@ class OpenAICompatibleClient:
         if self.config.structured_output:
             body["response_format"] = {"type": "json_schema",
                                        "json_schema": {"name": "verdict", "strict": True, "schema": schema}}
+        elif self.config.json_mode:
+            body["response_format"] = {"type": "json_object"}
         # urllib's default agent is blocked by Cloudflare in front of some endpoints (403, code 1010).
         headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
         if self.config.api_key:
