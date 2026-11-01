@@ -159,6 +159,28 @@ def read_json_events(path: Path) -> list[dict[str, Any]]:
 
 # --- Hayabusa ---------------------------------------------------------------
 
+EXTRA_PROVEN = Path("config") / "hayabusa_extra_proven_rules.txt"
+
+
+def read_rule_ids(path: Path) -> list[str]:
+    """Rule ids, one per line; '#' starts a comment."""
+    ids = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        rule_id = line.split("#", 1)[0].strip()
+        if rule_id:
+            ids.append(rule_id)
+    return ids
+
+
+def ensure_proven(proven: Path, extra: Path = EXTRA_PROVEN) -> None:
+    """Add our extra rule ids to Hayabusa's proven list (used by -P). Idempotent."""
+    have = set(read_rule_ids(proven))
+    missing = [r for r in read_rule_ids(extra) if r not in have]
+    if missing:
+        text = proven.read_text(encoding="utf-8")
+        proven.write_text(text + ("" if text.endswith("\n") else "\n") + "\n".join(missing) + "\n", encoding="utf-8")
+
+
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -182,10 +204,15 @@ def run_hayabusa(path: Path, fmt: str, binary: Path | None = None, timeout: int 
     binary = binary or default_hayabusa()
     if binary is None:
         raise SandboxError("the detection engine is not installed on this server")
+    proven = binary.parent / "rules" / "config" / "proven_rules.txt"
+    if proven.is_file():
+        ensure_proven(proven)
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "detections.jsonl"
         cmd = [str(binary), "dfir-timeline", "-f", str(path.resolve()), "-w", "-q", "-K", "-U",
-               "-t", "jsonl", "-p", "verbose", "-m", "low", "-o", str(out), "-C"]
+               "-t", "jsonl", "-p", "verbose", "-m", "low", "-o", str(out), "-C",
+               # Proven rules on one thread: peak memory 583 MB -> 193 MB, inside the free 512 MB instance.
+               "-P", "--threads", "1"]
         if fmt == "json":
             cmd.insert(4, "-J")
         try:

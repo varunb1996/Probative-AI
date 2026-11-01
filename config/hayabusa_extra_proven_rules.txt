@@ -1,0 +1,3 @@
+# Rules added to Hayabusa's proven list for the sandbox (which runs with -P to fit 512 MB).
+# Each fired on the public OTRF data and matters for triage. One rule id per line.
+9e00ae65-e5aa-2c89-c7a1-7b6ee0e194f5  # Network Connection Initiated By PowerShell Process (C2 callback; 5 labelled malicious alerts)

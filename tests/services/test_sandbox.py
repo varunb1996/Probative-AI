@@ -111,8 +111,26 @@ def test_hayabusa_only_loads_low_and_above_rules(monkeypatch, tmp_path):
     sandbox.run_hayabusa(tmp_path / "x.json", "json", binary=tmp_path / "hayabusa")
     cmd = seen["cmd"]
     assert cmd[cmd.index("-m") + 1] == "low"     # informational rules are never loaded: less memory
+    # Proven rules only, one thread: measured peak 583 MB -> 193 MB on a 5.6 MB file (free instance: 512 MB).
+    assert "-P" in cmd and cmd[cmd.index("--threads") + 1] == "1"
 
 
 def test_sandbox_scenarios_stay_small():
     # The 43 MB Mimikatz recording is the main docket; it does not fit the free instance's memory as a case.
     assert "empire_mimikatz_logonpasswords" not in sandbox.SCENARIOS
+
+
+def test_extra_rules_are_added_to_the_proven_list_once(tmp_path):
+    proven = tmp_path / "proven_rules.txt"
+    proven.write_text("aaaa\n", encoding="utf-8")
+    extra = tmp_path / "extra.txt"
+    extra.write_text("# why\nbbbb  # a C2 rule\naaaa\n", encoding="utf-8")
+    sandbox.ensure_proven(proven, extra)
+    sandbox.ensure_proven(proven, extra)
+    ids = [l.strip() for l in proven.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert ids == ["aaaa", "bbbb"]
+
+
+def test_the_powershell_c2_rule_is_kept_under_proven_rules():
+    ids = sandbox.read_rule_ids(sandbox.EXTRA_PROVEN)
+    assert "9e00ae65-e5aa-2c89-c7a1-7b6ee0e194f5" in ids
