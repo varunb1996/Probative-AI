@@ -12,6 +12,7 @@ from pathlib import Path
 
 from eval.harness.dataset import load_labels, load_pairs
 from eval.harness.jsonl_source import NoIntel
+from eval.harness.investigate import investigate
 from eval.harness.run import run
 from eval.harness.stack import calibrate, seed, stack
 from triage.pipeline.context import build_bundle
@@ -107,10 +108,15 @@ def main() -> None:
     s.add_argument("--provider", help="whose recorded results to replay (e.g. groq)")
     c = sub.add_parser("calibrate", help="write config/policy.json from recorded results on all labels")
     c.add_argument("--provider", help="whose recorded results to fit on (e.g. groq)")
+    i = sub.add_parser("investigate", help="Phase 5 gate: investigator vs escalate-to-human")
+    i.add_argument("--provider", help="model endpoint and recorded results to use (e.g. groq)")
+    i.add_argument("--pause", type=float, default=3, help="seconds between model calls")
     d = sub.add_parser("seed", help="load the labelled alerts into DATABASE_URL, routed with recorded results")
     d.add_argument("--provider", help="whose recorded results to replay (e.g. groq)")
     args = p.parse_args()
-    if args.command == "seed":
+    if args.command == "investigate":
+        print(f"report: {investigate(args.provider, args.pause)}")
+    elif args.command == "seed":
         print(f"seeded; newly queued: {seed(args.provider)}")
     elif args.command == "baseline":
         baseline(args.allowlist, timedelta(minutes=args.dedup_minutes))
