@@ -174,7 +174,7 @@ def engine_reason(output: str) -> str:
 
 def default_hayabusa() -> Path | None:
     candidates = [os.environ.get("HAYABUSA_PATH", ""), "tools/hayabusa/hayabusa-4.3.1-win-x64.exe",
-                  "tools/hayabusa-linux/hayabusa-4.3.1-lin-x64-gnu"]
+                  "tools/hayabusa-linux/hayabusa-4.3.1-lin-x64-musl"]
     for c in candidates:
         if c and Path(c).is_file():
             return Path(c).resolve()

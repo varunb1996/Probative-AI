@@ -15,9 +15,9 @@ import zipfile
 from pathlib import Path
 
 VERSION = "4.3.1"
-NAME = f"hayabusa-{VERSION}-lin-x64-gnu"
+NAME = f"hayabusa-{VERSION}-lin-x64-musl"   # static: the gnu build needs glibc 2.39, newer than Render has
 URL = f"https://github.com/Yamato-Security/hayabusa/releases/download/v{VERSION}/{NAME}.zip"
-SHA256 = "a4fbdae9b13a5fe0f3b3d98981dd18775f50e5402cf3dee3ba85d4ecd252370e"   # GitHub's published digest
+SHA256 = "8592a844a29b0b8ad10d80550fd5b835eec0bea7c488b61e8d48d400a6057402"   # GitHub's published digest
 DEST = Path("tools") / "hayabusa-linux"
 
 
