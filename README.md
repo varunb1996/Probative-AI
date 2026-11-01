@@ -90,3 +90,7 @@ python -m eval.harness baseline                  # deterministic baselines
 python -m eval.harness run --provider groq       # full pipeline + LLM, writes eval/reports/<timestamp>.md
 python -m eval.harness stack --provider groq     # replay the recorded run through Postgres + workers (Phase 4 gate)
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE). The OTRF datasets and Hayabusa rules keep their own licenses.
