@@ -86,6 +86,13 @@ def test_case_ids_are_unguessable_and_scope_event_ids():
     assert sandbox.case_event_id(a, "Security:1") == f"{a}/Security:1"
 
 
+def test_engine_failure_reason_is_the_last_meaningful_line_without_colour():
+    output = "\x1b[0mStarting\x1b[0m\n\nError: \x1b[31mCould not find rules folder\x1b[0m\n   \n"
+    assert sandbox.engine_reason(output) == "Error: Could not find rules folder"
+    assert sandbox.engine_reason("") == "no output"
+    assert len(sandbox.engine_reason("x" * 500)) <= 160
+
+
 def test_client_hash_never_stores_the_address():
     h = sandbox.client_hash("203.0.113.9")
     assert "203.0.113.9" not in h and h == sandbox.client_hash("203.0.113.9")

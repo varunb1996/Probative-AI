@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -162,6 +163,15 @@ def read_json_events(path: Path) -> list[dict[str, Any]]:
 
 # --- Hayabusa ---------------------------------------------------------------
 
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def engine_reason(output: str) -> str:
+    """The last non-blank line of Hayabusa's output, colour codes stripped, for the visitor."""
+    lines = [line.strip() for line in _ANSI.sub("", output).splitlines() if line.strip()]
+    return lines[-1][:160] if lines else "no output"
+
+
 def default_hayabusa() -> Path | None:
     candidates = [os.environ.get("HAYABUSA_PATH", ""), "tools/hayabusa/hayabusa-4.3.1-win-x64.exe",
                   "tools/hayabusa-linux/hayabusa-4.3.1-lin-x64-gnu"]
@@ -183,13 +193,14 @@ def run_hayabusa(path: Path, fmt: str, binary: Path | None = None, timeout: int 
         if fmt == "json":
             cmd.insert(4, "-J")
         try:
-            subprocess.run(cmd, cwd=binary.parent, check=True, timeout=timeout,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            subprocess.run(cmd, cwd=binary.parent, check=True, timeout=timeout, capture_output=True,
+                           text=True, errors="replace")
         except subprocess.TimeoutExpired as e:
             raise SandboxError("detection took too long for the sandbox; try a smaller file") from e
         except subprocess.CalledProcessError as e:
-            log.error("hayabusa failed: %s", e.stderr[-500:] if e.stderr else "")
-            raise SandboxError("the detection engine could not read this file") from e
+            output = f"{e.stdout or ''}\n{e.stderr or ''}"
+            log.error("hayabusa exited %s: %s", e.returncode, output[-2000:])
+            raise SandboxError(f"the detection engine could not read this file ({engine_reason(output)})") from e
         if not out.exists():
             return []
         with out.open(encoding="utf-8") as f:
