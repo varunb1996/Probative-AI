@@ -22,6 +22,10 @@ class DecisionError(Exception):
     """The model's decision was not a valid tool call or verdict (off-schema output)."""
 
 
+class ModelUnavailable(Exception):
+    """The provider refused or failed the call (quota, outage). Not the model's fault, not retried."""
+
+
 class Decision(BaseModel):
     """What the model proposes next: one tool call, or a final verdict."""
 
@@ -64,6 +68,8 @@ def run_investigation(bundle: EvidenceBundle, score: EvidenceScore, decide: Deci
 
         try:
             decision = decide(bundle, score, state)
+        except ModelUnavailable as e:
+            return stop(f"model unavailable: {str(e)[:200]}")
         except DecisionError as e:
             state = log(QueryRecord(tool="(malformed)", arguments={}, result_event_ids=[], error=str(e)))
             malformed += 1

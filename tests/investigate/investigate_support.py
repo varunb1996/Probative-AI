@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from triage.domain import EvidenceBundle, Event, IntelHit, ProcessRef, Verdict
-from triage.investigate.loop import Decision, DecisionError
+from triage.investigate.loop import Decision
 from triage.pipeline.parse import parse_alert, parse_event
 from triage.pipeline.process import actor_process, parent_process
 from triage.verify.checks import VerifyPolicy
@@ -91,7 +91,7 @@ def verdict(bundle, label="malicious", confidence=0.9, cite_all=True, tokens=100
 
 
 class Script:
-    """decide() that plays a list of steps. A step is a Decision, a DecisionError, or a callable(bundle)."""
+    """decide() that plays a list of steps. A step is a Decision, an exception to raise, or a callable(bundle)."""
 
     def __init__(self, *steps):
         self.steps = list(steps)
@@ -100,6 +100,6 @@ class Script:
     def __call__(self, bundle, score, state):
         self.seen_states.append(state)
         step = self.steps.pop(0)
-        if isinstance(step, DecisionError):
+        if isinstance(step, Exception):
             raise step
         return step(bundle) if callable(step) else step

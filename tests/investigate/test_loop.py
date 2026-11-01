@@ -2,7 +2,7 @@
 
 from investigate_support import ATTACKER, POLICY, Intel, Script, Source, all_events, start_bundle, tool, verdict
 
-from triage.investigate.loop import Budget, DecisionError, run_investigation
+from triage.investigate.loop import Budget, DecisionError, ModelUnavailable, run_investigation
 from triage.pipeline.score import score
 
 
@@ -110,3 +110,9 @@ def test_the_investigator_is_read_only():
                       Script(tool("process_tree", **ATTACKER), lambda b: verdict(b)),
                       Source(events), Intel(), POLICY, Budget())
     assert [e.model_dump() for e in events] == before
+
+
+def test_an_unavailable_model_stops_at_once_and_says_so():
+    result = _run(Script(tool("process_tree", **ATTACKER), ModelUnavailable("HTTP 429: tokens per day")))
+    assert not result.verified and result.stop_reason.startswith("model unavailable")
+    assert result.state.step_count == 1      # the refused call is not a step the model took

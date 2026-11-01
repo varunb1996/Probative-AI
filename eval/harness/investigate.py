@@ -48,15 +48,16 @@ def compare(rows: list[Outcome]) -> dict[str, dict]:
     return {"Escalate to a human": metrics(set(), 0), "Investigator": metrics(closes, sum(r.tokens for r in rows))}
 
 
-def investigate(provider: str | None, pause: float) -> Path:
+def investigate(provider: str | None, pause: float, recorded_provider: str | None = None) -> Path:
+    """`provider` runs the investigator; `recorded_provider` (default: the same) names the recorded
+    triage run whose routes select the alerts."""
     load_env()
     env = provider_env(os.environ, provider)
     config = InferenceConfig.from_env(env)
-    plain = config.model_copy(update={"structured_output": False, "json_mode": True})
-    decide = model_decide(PatientClient(OpenAICompatibleClient(plain), pause), plain)
-    recorded = cache_dir(provider)
+    decide = model_decide(PatientClient(OpenAICompatibleClient(config), pause), config)
+    recorded = cache_dir(recorded_provider or provider)
     judge_fn = replay_judge(recorded)
-    store = recorded / "investigations"
+    store = cache_dir(provider) / "investigations"
     store.mkdir(parents=True, exist_ok=True)
 
     _, pairs = read_scenario(DATA)
@@ -78,7 +79,7 @@ def investigate(provider: str | None, pause: float) -> Path:
             note = "cached"
         else:
             inv = run_investigation(bundle, evidence, decide, source, NoIntel(), _policy(thresholds, bundle.alert))
-            if not any((q.error or "").startswith("inference error") for q in inv.state.query_log):
+            if not inv.stop_reason.startswith("model unavailable"):   # a provider refusal is not a result
                 path.write_text(inv.model_dump_json(indent=1), encoding="utf-8")
             note = f"{inv.state.tokens_used} tokens"
         decision = route_investigation(inv, RuleMode.SHADOW)
@@ -88,7 +89,7 @@ def investigate(provider: str | None, pause: float) -> Path:
         rows.append(Outcome(alert_id, label, str(decision.route), inv.state.tokens_used))
         invs[alert_id] = (inv, decision, labelled[alert_id][0].rule_title)
 
-    text = _render(rows, invs, config)
+    text = _render(rows, invs, config, recorded)
     REPORTS.mkdir(parents=True, exist_ok=True)
     out = REPORTS / f"investigator-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.md"
     out.write_text(text, encoding="utf-8")
@@ -100,11 +101,11 @@ def _pct(x: float) -> str:
     return "n/a" if x != x else f"{x:.0%}"
 
 
-def _render(rows: list[Outcome], invs: dict, config: InferenceConfig) -> str:
+def _render(rows: list[Outcome], invs: dict, config: InferenceConfig, recorded: Path) -> str:
     table = compare(rows)
     lines = [f"# Investigator report: {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC", "",
-             f"Model `{config.model}` at `{config.base_url}`. Alerts: the {len(rows)} labelled alerts the recorded "
-             "Phase 3c run routed to investigate (suspicious, insufficient context). Read-only tools, at most 6 steps, "
+             f"Investigator model `{config.model}` at `{config.base_url}`. Alerts: the {len(rows)} labelled alerts "
+             f"the recorded triage run in `{recorded.as_posix()}` routed to investigate (suspicious, insufficient context). Read-only tools, at most 6 steps, "
              "the same verifier; shadow mode, so a close is a suggestion to a human.", "",
              "| Method | n | Malicious | Recall on malicious | Closed | Malicious among closes | Tokens |",
              "| --- | --- | --- | --- | --- | --- | --- |"]

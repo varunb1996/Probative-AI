@@ -42,7 +42,6 @@ class InferenceConfig(BaseModel):
     allow_cloud: bool = False
     timeout: float = 120.0
     structured_output: bool = True   # send the Verdict JSON schema as response_format
-    json_mode: bool = False          # without a schema: ask for any JSON object (response_format json_object)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "InferenceConfig":
@@ -56,10 +55,12 @@ class InferenceConfig(BaseModel):
 class Completion:
     text: str
     tokens: int
+    tool_call: tuple[str, str] | None = None    # (function name, JSON arguments) when tools were offered
 
 
 class ChatClient(Protocol):
-    def complete(self, messages: list[dict], schema: dict[str, Any]) -> Completion: ...
+    def complete(self, messages: list[dict], schema: dict[str, Any],
+                 tools: list[dict] | None = None) -> Completion: ...
 
 
 def is_local(base_url: str) -> bool:
@@ -81,13 +82,17 @@ class OpenAICompatibleClient:
     def __init__(self, config: InferenceConfig):
         self.config = config
 
-    def complete(self, messages: list[dict], schema: dict[str, Any]) -> Completion:
+    def complete(self, messages: list[dict], schema: dict[str, Any],
+                 tools: list[dict] | None = None) -> Completion:
+        """With `tools`, the model must answer with exactly one function call (it only proposes;
+        the caller validates and executes). Without, the reply is text, schema-guided if configured."""
         body: dict[str, Any] = {"model": self.config.model, "messages": messages, "temperature": 0}
-        if self.config.structured_output:
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "required"
+        elif self.config.structured_output:
             body["response_format"] = {"type": "json_schema",
                                        "json_schema": {"name": "verdict", "strict": True, "schema": schema}}
-        elif self.config.json_mode:
-            body["response_format"] = {"type": "json_object"}
         # urllib's default agent is blocked by Cloudflare in front of some endpoints (403, code 1010).
         headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
         if self.config.api_key:
@@ -104,9 +109,16 @@ class OpenAICompatibleClient:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             raise InferenceError(str(e)) from e
         try:
-            text = payload["choices"][0]["message"]["content"]
+            message = payload["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as e:
             raise InferenceError(f"no completion in response: {str(payload)[:300]}") from e
+        tokens = int((payload.get("usage") or {}).get("total_tokens") or 0)
+        calls = message.get("tool_calls") or []
+        if calls:
+            function = calls[0].get("function") or {}
+            return Completion(text=message.get("content") or "", tokens=tokens,
+                              tool_call=(str(function.get("name", "")), str(function.get("arguments", ""))))
+        text = message.get("content")
         if not isinstance(text, str):
             raise InferenceError("completion content is not text")
-        return Completion(text=text, tokens=int((payload.get("usage") or {}).get("total_tokens") or 0))
+        return Completion(text=text, tokens=tokens)

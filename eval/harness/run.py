@@ -35,11 +35,11 @@ class PatientClient:
     def __init__(self, inner: OpenAICompatibleClient, pause: float):
         self.inner, self.pause = inner, pause
 
-    def complete(self, messages, schema) -> Completion:
+    def complete(self, messages, schema, tools=None) -> Completion:
         for wait in (*RATE_LIMIT_WAITS, None):
             time.sleep(self.pause)
             try:
-                return self.inner.complete(messages, schema)
+                return self.inner.complete(messages, schema, tools)
             except RateLimited:
                 if wait is None:
                     raise

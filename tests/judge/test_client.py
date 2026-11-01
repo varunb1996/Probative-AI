@@ -72,9 +72,28 @@ def test_other_http_errors_are_plain_inference_errors(monkeypatch):
     assert not isinstance(info.value, RateLimited)
 
 
-def test_json_mode_sends_json_object_without_a_schema(monkeypatch):
+
+def _capture_reply(sent, message):
+    def urlopen(request, timeout):
+        sent.append(json.loads(request.data))
+        return io.BytesIO(json.dumps({"choices": [{"message": message}], "usage": {"total_tokens": 9}}).encode())
+    return urlopen
+
+
+def test_tools_are_declared_and_one_call_is_required(monkeypatch):
     sent = []
-    monkeypatch.setattr(client_module.urllib.request, "urlopen", _capture(sent))
-    config = CLOUD.model_copy(update={"structured_output": False, "json_mode": True})
-    OpenAICompatibleClient(config).complete([], {})
-    assert sent[0]["response_format"] == {"type": "json_object"}
+    call = {"type": "function", "function": {"name": "process_tree", "arguments": '{"host": "h", "pid": 1}'}}
+    monkeypatch.setattr(client_module.urllib.request, "urlopen",
+                        _capture_reply(sent, {"content": None, "tool_calls": [call]}))
+    tools = [{"type": "function", "function": {"name": "process_tree", "parameters": {"type": "object"}}}]
+    completion = OpenAICompatibleClient(CLOUD).complete([], {}, tools=tools)
+    assert sent[0]["tools"] == tools and sent[0]["tool_choice"] == "required"
+    assert "response_format" not in sent[0]
+    assert completion.tool_call == ("process_tree", '{"host": "h", "pid": 1}') and completion.text == ""
+
+
+def test_without_tools_nothing_changes(monkeypatch):
+    sent = []
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", _capture_reply(sent, {"content": "{}"}))
+    completion = OpenAICompatibleClient(CLOUD).complete([], {"type": "object"})
+    assert "tools" not in sent[0] and completion.tool_call is None and completion.text == "{}"

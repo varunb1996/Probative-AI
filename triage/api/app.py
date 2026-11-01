@@ -55,10 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.run_workers:
             config = inference_config(os.environ)
             policy = load_policy(os.environ)
-            # The investigator's replies are a union (tool call | verdict); strict schema mode cannot express
-            # it on most providers, so it runs without response_format. Parsing stays strict either way.
-            plain = config.model_copy(update={"structured_output": False, "json_mode": True})
-            decide = model_decide(workers.PatientClient(OpenAICompatibleClient(plain)), plain)
+            decide = model_decide(workers.PatientClient(OpenAICompatibleClient(config)), config)
             workers.start(settings.database_url, workers.model_judge(OpenAICompatibleClient(config), config),
                           lambda alert: policy, stop, settings.poll_seconds, gate=sandbox.budget_gate, decide=decide)
             sandbox.start_case_worker(settings.database_url, stop, settings.poll_seconds)

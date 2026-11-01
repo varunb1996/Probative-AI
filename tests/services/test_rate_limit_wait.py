@@ -10,7 +10,7 @@ class Flaky:
     def __init__(self, failures, error=RateLimited):
         self.failures, self.error, self.calls = failures, error, 0
 
-    def complete(self, messages, schema):
+    def complete(self, messages, schema, tools=None):
         self.calls += 1
         if self.calls <= self.failures:
             raise self.error("HTTP 429")

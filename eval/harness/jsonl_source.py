@@ -39,7 +39,8 @@ class JsonlEventSource:
                 if (e.fields.get("Channel"), e.fields.get("EventID")) in _NETWORK]
 
     def host_window(self, host: str, start: datetime, end: datetime) -> list[Event]:
-        raise NotImplementedError("investigator only; not used by the baseline")
+        """The investigator's capped time-window query (the cap is enforced by its tool)."""
+        return [e for e, _, _ in self._by_host[host] if start <= e.timestamp <= end]
 
 
 class NoIntel:

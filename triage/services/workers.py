@@ -57,10 +57,10 @@ class PatientClient:
     def __init__(self, inner: ChatClient):
         self.inner = inner
 
-    def complete(self, messages: list[dict], schema: dict) -> Completion:
+    def complete(self, messages: list[dict], schema: dict, tools: list[dict] | None = None) -> Completion:
         for wait in (*RATE_LIMIT_WAITS, None):
             try:
-                return self.inner.complete(messages, schema)
+                return self.inner.complete(messages, schema, tools)
             except RateLimited:
                 if wait is None:
                     raise

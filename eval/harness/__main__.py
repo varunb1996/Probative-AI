@@ -111,11 +111,12 @@ def main() -> None:
     i = sub.add_parser("investigate", help="Phase 5 gate: investigator vs escalate-to-human")
     i.add_argument("--provider", help="model endpoint and recorded results to use (e.g. groq)")
     i.add_argument("--pause", type=float, default=3, help="seconds between model calls")
+    i.add_argument("--recorded", help="whose recorded triage run selects the alerts (default: --provider)")
     d = sub.add_parser("seed", help="load the labelled alerts into DATABASE_URL, routed with recorded results")
     d.add_argument("--provider", help="whose recorded results to replay (e.g. groq)")
     args = p.parse_args()
     if args.command == "investigate":
-        print(f"report: {investigate(args.provider, args.pause)}")
+        print(f"report: {investigate(args.provider, args.pause, args.recorded)}")
     elif args.command == "seed":
         print(f"seeded; newly queued: {seed(args.provider)}")
     elif args.command == "baseline":
