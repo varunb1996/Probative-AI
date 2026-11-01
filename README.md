@@ -26,6 +26,19 @@ Neither kill condition fired; the success bar (>= 50% closed at >= 95% recall) i
 Caveats: one lab scenario, 35 labels (30 Claude-proposed and human-reviewed), free-tier model limits.
 See [`docs/baseline.md`](docs/baseline.md) and the report's caveats.
 
+## Try it
+
+Live: **https://probative-ai.onrender.com** (free tier: the first visit after ~15 idle minutes takes about a minute).
+
+- **The docket** (`/`): the labelled OTRF alerts, routed and waiting for an analyst.
+- **The sandbox** (`/try`): open a case from a public OTRF attack recording, or upload a Windows `.evtx` file or
+  OTRF-style JSON lines (up to 10 MB). Hayabusa runs Sigma over it on the server; every alert gets the deterministic
+  pipeline and evidence score; the 5 highest-scoring get an LLM verdict cross-examined by the verifier. The rest are
+  marked "AI not run" and escalate (never shown as benign). You get a private link; the case is deleted after 24 hours.
+- **Do not upload company, customer or personal logs.** For uploads, the uploader's "no private data" declaration is
+  what tags the data `dataset=public` and so allows the cloud model. Limits: 3 cases per hour per visitor, 30 AI
+  verdicts per day site-wide.
+
 ## Architecture as deployed
 
 - **Postgres (Neon)** holds events, alerts, verdicts, human decisions, rule modes and an append-only audit log.

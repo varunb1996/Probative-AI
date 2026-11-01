@@ -67,10 +67,6 @@ SCENARIOS = {
         "Mimikatz steals logged-on passwords",
         "An Empire PowerShell agent runs Mimikatz sekurlsa::logonpasswords, reading credentials out of LSASS memory.",
         _OTRF + "credential_access/host/empire_mimikatz_logonpasswords.zip"),
-    "psh_lsass_memory_dump_comsvcs": Scenario(
-        "LSASS dumped with a built-in Windows DLL",
-        "PowerShell uses comsvcs.dll's MiniDump export to write LSASS memory to disk: no attacker tools needed.",
-        _OTRF + "credential_access/host/psh_lsass_memory_dump_comsvcs.zip"),
     "empire_launcher_vbs": Scenario(
         "Empire agent launched from a VBScript",
         "A VBScript launcher starts an Empire PowerShell agent that calls back to its server.",
@@ -291,6 +287,30 @@ def sweep_expired(conn: psycopg.Connection) -> int:
     return len(expired)
 
 
+def enqueue_upload(conn: psycopg.Connection, case_id: str, path: Path, fmt: str) -> None:
+    queue.enqueue(conn, CASES, case_id, {"path": str(path), "format": fmt})
+
+
+def enqueue_scenario(conn: psycopg.Connection, case_id: str, key: str) -> None:
+    scenario(key)
+    queue.enqueue(conn, CASES, case_id, {"scenario": key, "format": "json"})
+
+
+def run_case_message(conn: psycopg.Connection, case_id: str, payload: dict[str, Any]) -> None:
+    """A queued case: download its scenario if it has one, then process the file."""
+    if "scenario" in payload:
+        UPLOADS.mkdir(parents=True, exist_ok=True)
+        repo.update_case(conn, case_id, status="processing", detail="downloading the scenario")
+        try:
+            path = fetch_scenario(payload["scenario"], Path(tempfile.mkdtemp(dir=UPLOADS)))
+        except (SandboxError, OSError, zipfile.BadZipFile) as e:
+            repo.update_case(conn, case_id, status="failed", detail=f"could not download the scenario ({e})")
+            return
+    else:
+        path = Path(payload["path"])
+    process_case(conn, case_id, path, payload["format"])
+
+
 def start_case_worker(url: str, stop: threading.Event, poll_seconds: float) -> threading.Thread:
     """One thread processes queued cases, one at a time."""
     def loop():
@@ -298,7 +318,7 @@ def start_case_worker(url: str, stop: threading.Event, poll_seconds: float) -> t
             while not stop.is_set():
                 batch = queue.claim(conn, CASES, lease=timedelta(minutes=15))
                 for msg in batch:
-                    process_case(conn, msg.alert_id, Path(msg.payload["path"]), msg.payload["format"])
+                    run_case_message(conn, msg.alert_id, msg.payload)
                     queue.ack(conn, msg.id)
                 if not batch:
                     stop.wait(poll_seconds)

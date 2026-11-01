@@ -9,12 +9,13 @@ One triage thread means at most one inference call in flight.
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 
 import psycopg
 
 from triage.domain import Alert, EvidenceBundle, EvidenceScore, IntelLookup, JudgeResult
-from triage.judge.client import ChatClient, CloudRefused, InferenceConfig
+from triage.judge.client import ChatClient, CloudRefused, Completion, InferenceConfig, RateLimited
 from triage.judge.judge import judge
 from triage.pipeline.context import build_bundle
 from triage.pipeline.enrich import enrich
@@ -46,8 +47,30 @@ class NoIntel:
         return None
 
 
+RATE_LIMIT_WAITS = (10, 20, 40)
+
+
+class PatientClient:
+    """Waits and resends on HTTP 429 only. Not the judge's single retry on invalid output."""
+
+    def __init__(self, inner: ChatClient):
+        self.inner = inner
+
+    def complete(self, messages: list[dict], schema: dict) -> Completion:
+        for wait in (*RATE_LIMIT_WAITS, None):
+            try:
+                return self.inner.complete(messages, schema)
+            except RateLimited:
+                if wait is None:
+                    raise
+                log.info("rate limited; waiting %ss", wait)
+                time.sleep(wait)
+        raise AssertionError("unreachable")
+
+
 def model_judge(client: ChatClient, config: InferenceConfig) -> JudgeFn:
-    return lambda bundle, evidence: judge(bundle, evidence, client, config)
+    patient = PatientClient(client)
+    return lambda bundle, evidence: judge(bundle, evidence, patient, config)
 
 
 def enrich_step(conn: psycopg.Connection, msg: queue.Message, intel: IntelLookup) -> None:

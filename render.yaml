@@ -5,7 +5,7 @@ services:
     name: probative-ai
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python scripts/install_hayabusa.py
     startCommand: uvicorn --factory triage.api.app:create_app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

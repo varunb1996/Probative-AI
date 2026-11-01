@@ -133,7 +133,39 @@ footer { margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--ink); 
          display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .back { font: 600 12px var(--label); letter-spacing: .18em; text-transform: uppercase; text-decoration: none; }
 
+.cta { display: inline-flex; align-items: center; gap: 10px; margin-top: 26px; padding: 12px 18px; text-decoration: none;
+       font: 600 12px var(--label); letter-spacing: .18em; text-transform: uppercase; color: var(--paper); background: var(--ink);
+       box-shadow: 4px 4px 0 var(--margin); transition: transform .15s, box-shadow .15s; }
+.cta:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--margin); }
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 22px; margin-top: 18px; }
+.file { position: relative; background: var(--card); box-shadow: var(--shadow); padding: 30px 20px 18px; margin-top: 14px;
+        display: flex; flex-direction: column; gap: 10px; animation: rise .55s cubic-bezier(.2,.7,.2,1) both;
+        animation-delay: calc(var(--i) * 70ms + 150ms); }
+.file::before { content: attr(data-tab); position: absolute; top: -14px; left: 0; padding: 4px 12px 3px; background: var(--card);
+                font: 500 10px var(--mono); color: var(--ink-soft); letter-spacing: .06em; border-radius: 4px 4px 0 0;
+                max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file b { font: 400 22px/1.15 var(--display); }
+.file p { margin: 0; font-size: 15px; color: var(--ink-soft); flex: 1; }
+.file button, .bag button { align-self: flex-start; font: 600 11px var(--label); letter-spacing: .18em; text-transform: uppercase;
+        padding: 9px 14px; border: 2px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
+.file button:hover, .bag button:hover { background: var(--ink); color: var(--paper); }
+.bag { margin-top: 18px; padding: 26px; border: 2px dashed var(--ink-soft); background:
+       repeating-linear-gradient(-45deg, transparent 0 14px, var(--rule) 14px 15px), var(--card);
+       display: grid; gap: 14px; animation: rise .55s .35s cubic-bezier(.2,.7,.2,1) both; }
+.bag.over { border-color: var(--margin); }
+.bag input[type=file] { font: 400 13px var(--mono); color: var(--ink); }
+.bag label { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+.bag label input { margin-top: 5px; accent-color: var(--margin); }
+.warning { border-left: 3px solid var(--escalate); padding: 4px 0 4px 14px; font-size: 15px; }
+.warning b { color: var(--escalate); }
+.status { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin-top: 22px; font: 400 13px var(--mono); color: var(--ink-soft); }
+.status .pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--investigate); animation: pulse 1.4s infinite; }
+.status.failed { color: var(--escalate); }
+.progress { height: 4px; background: var(--rule); margin-top: 12px; position: relative; }
+.progress i { position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--margin); transition: width .4s; }
+
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes pulse { 50% { opacity: .25; } }
 @keyframes stamp { 0% { opacity: 0; transform: rotate(-14deg) scale(1.9); } 70% { opacity: .92; } 100% { transform: rotate(-4deg) scale(1); } }
 @keyframes fill { from { width: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -171,10 +203,11 @@ document.querySelectorAll('form.decide').forEach(function (form) {
 """
 
 
-def _page(title: str, body: str, script: str = "") -> str:
+def _page(title: str, body: str, script: str = "", refresh: int | None = None) -> str:
     tail = f"<script>{script}</script>" if script else ""
+    meta = f"<meta http-equiv='refresh' content='{refresh}'>" if refresh else ""
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-            "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            f"<meta name='viewport' content='width=device-width, initial-scale=1'>{meta}"
             f"<title>{escape(title)}</title><link rel='preconnect' href='https://fonts.googleapis.com'>"
             f"<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin><link rel='stylesheet' href='{FONTS}'>"
             f"<style>{_STYLE}</style></head><body><main>{body}{_footer()}</main>{tail}</body></html>")
@@ -196,7 +229,8 @@ def _docket(rows: list[dict[str, Any]], offset: int) -> str:
     for n, r in enumerate(rows):
         i = n + offset
         alert_id = escape(r["alert_id"])
-        reasons = ", ".join(r["reasons"])
+        error = (r.get("judge_result") or {}).get("error") or ""
+        reasons = "AI not run (budget): scored and escalated" if error.startswith("AI not run") else ", ".join(r["reasons"])
         items.append(
             f"<li class='entry' style='--i:{i}'>"
             f"<div class='title'><a href='/alerts/{alert_id}'>{escape(r['rule_title'])}</a></div>"
@@ -218,6 +252,7 @@ def home(counts: dict[str, int], analyst_queue: list[dict], suggestions: list[di
         "Scenario: <code>empire_mimikatz_logonpasswords</code>.</p>"
         "<p class='procedure'><b>detect</b> → parse → noise → process-scoped context → enrich → "
         "<b>evidence score</b> → <span class='model'>one LLM judgment</span> → <b>verifier</b> → route → human</p>"
+        "<a class='cta' href='/try'>Try it on an attack recording or your own log →</a>"
         f"<div class='tally'>{tally}</div>"
         f"<h2>Analyst queue <span class='count'>{len(analyst_queue)} open</span></h2>{_docket(analyst_queue, 0)}"
         f"<h2>Suggested closes <span class='count'>{len(suggestions)} awaiting a human</span></h2>"
@@ -235,7 +270,10 @@ def _decide_form(alert_id: str) -> str:
 
 def alert(detail: dict[str, Any]) -> str:
     a, verdict, trigger = detail["alert"], detail["verdict"], detail["trigger_event"]
-    head = (f"<a class='back' href='/'>← Docket</a>"
+    case_id = detail.get("case_id")
+    back = (f"<a class='back' href='/cases/{escape(case_id)}'>← Case</a>" if case_id
+            else "<a class='back' href='/'>← Docket</a>")
+    head = (back +
             f"<div class='kicker' style='margin-top:28px'>Exhibit · {escape(a['alert_id'])}</div>"
             f"<h1 style='font-size:clamp(34px,5vw,58px)'>{escape(a['rule_title'])}</h1>"
             f"<p class='lede mono'>{escape(a['host'])} · {escape(a['timestamp'])} · level {escape(a['rule_level'])}"
@@ -263,7 +301,7 @@ def alert(detail: dict[str, Any]) -> str:
             d = detail["decision"]
             parts.append(f"<dt>Human decision</dt><dd>{escape(d['decision'])} by {escape(d['analyst'])}</dd>")
         parts.append("</dl>")
-        if verdict["route"] == "suggest_close" and not detail.get("decision"):
+        if verdict["route"] == "suggest_close" and not detail.get("decision") and not case_id:
             parts.append(_decide_form(a["alert_id"]))
         parts.append("</section>")
         finding = "".join(parts)
@@ -279,3 +317,87 @@ def alert(detail: dict[str, Any]) -> str:
                 f"<span class='mono'>{escape(trigger['event_id'])}</span></h3><div class='scroll'><table>{rows}</table></div></section>")
     script = _DECIDE_JS if "class='decide'" in finding else ""
     return _page(f"{a['rule_title']} · Probative AI", head + f"<div class='exhibit'>{finding}{checks}</div>" + evidence, script)
+
+
+_TRY_JS = """
+function post(url, opts, out) {
+  out.textContent = 'Opening a case…';
+  fetch(url, Object.assign({method: 'POST'}, opts)).then(function (r) {
+    return r.json().then(function (b) { return {ok: r.ok, body: b}; });
+  }).then(function (res) {
+    if (res.ok) { location.href = res.body.url; return; }
+    out.textContent = res.body.detail || 'That did not work.';
+  }).catch(function () { out.textContent = 'Could not reach the server.'; });
+}
+document.querySelectorAll('[data-scenario]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    post('/api/cases/scenario/' + encodeURIComponent(btn.dataset.scenario), {}, document.getElementById('scenario-out'));
+  });
+});
+var bag = document.getElementById('bag');
+bag.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var out = bag.querySelector('output'), file = bag.file.files[0];
+  if (!file) { out.textContent = 'Choose a file first.'; return; }
+  if (!bag.declared.checked) { out.textContent = 'Tick the box to confirm the file has no private data.'; return; }
+  if (file.size > Number(bag.dataset.max)) { out.textContent = 'That file is larger than the sandbox allows.'; return; }
+  post('/api/cases/upload', {headers: {'X-Declared-Public': 'yes', 'X-Filename': encodeURIComponent(file.name)},
+                             body: file}, out);
+});
+['dragover', 'dragenter'].forEach(function (t) { bag.addEventListener(t, function (e) { e.preventDefault(); bag.classList.add('over'); }); });
+['dragleave', 'drop'].forEach(function (t) { bag.addEventListener(t, function () { bag.classList.remove('over'); }); });
+bag.addEventListener('drop', function (e) { e.preventDefault(); if (e.dataTransfer.files.length) bag.file.files = e.dataTransfer.files; });
+"""
+
+
+def try_page(scenarios: dict, max_bytes: int) -> str:
+    files = "".join(
+        f"<div class='file' style='--i:{i}' data-tab='OTRF · {escape(key)}'><b>{escape(s.title)}</b><p>{escape(s.blurb)}</p>"
+        f"<button type='button' data-scenario='{escape(key)}'>Open this case</button></div>"
+        for i, (key, s) in enumerate(scenarios.items()))
+    body = (
+        "<a class='back' href='/'>← Docket</a>"
+        "<div class='kicker' style='margin-top:28px'>Sandbox · cases expire after 24 hours</div>"
+        "<h1>Open a <em>case</em></h1>"
+        "<p class='lede'>Run the full pipeline on a recorded attack, or on a Windows log of your own: Sigma detection, "
+        "process-scoped evidence, a deterministic score for every alert, and an AI verdict, cross-examined in code, "
+        "for the five strongest. You get a private link to the results.</p>"
+        "<h2>A public attack recording</h2>"
+        "<p class='lede'>Real lab recordings from the Open Threat Research Forge (OTRF Security-Datasets).</p>"
+        f"<div class='files'>{files}</div><p><output id='scenario-out' class='muted'></output></p>"
+        "<h2>Your own log</h2>"
+        f"<form id='bag' class='bag' data-max='{max_bytes}'>"
+        "<div class='warning'><b>Do not upload company, customer or personal logs.</b> Logs carry usernames, hostnames "
+        "and addresses. The five strongest alerts are sent to a cloud AI model, and the case is stored for 24 hours. "
+        "Use your own lab, a test VM, or a public dataset.</div>"
+        f"<input type='file' name='file' accept='.evtx,.json,.jsonl'>"
+        f"<p class='muted' style='margin:0;font-size:14px'>A Windows <code class='mono'>.evtx</code> file (Sysmon or Security "
+        f"work best) or OTRF-style JSON lines, up to {max_bytes // (1024 * 1024)} MB. Drop it here or choose it.</p>"
+        "<label><input type='checkbox' name='declared'> I confirm this file contains no private or confidential "
+        "data, and I am allowed to share it.</label>"
+        "<button type='submit'>Open a case from this file</button><output class='muted'></output></form>")
+    return _page("Open a case · Probative AI", body, _TRY_JS)
+
+
+def case(case: dict, triaged: int, analyst_queue: list[dict], suggestions: list[dict]) -> str:
+    status, n_alerts = case["status"], case["n_alerts"]
+    working = status in ("queued", "processing") or (status == "ready" and triaged < n_alerts)
+    if status == "failed":
+        line = f"<div class='status failed'>Could not process this file: {escape(case['detail'] or 'unknown error')}</div>"
+    elif status in ("queued", "processing"):
+        line = (f"<div class='status'><span class='pulse'></span>{escape(case['detail'] or 'Reading the file and running Sigma detection')}"
+                "… this page refreshes itself.</div>")
+    else:
+        pct = 100 * triaged / n_alerts if n_alerts else 100
+        line = (f"<div class='status'>{'<span class=pulse></span>' if working else ''}"
+                f"{case['n_events']:,} events · {n_alerts} alerts · {triaged} triaged"
+                f"{' · refreshing' if working else ''}</div><div class='progress'><i style='--v:{pct:.0f}%'></i></div>")
+        if n_alerts == 0:
+            line += "<p class='lede' style='margin-top:16px'>No Sigma rule above informational level fired on this file.</p>"
+    body = (
+        "<a class='back' href='/try'>← Open another case</a>"
+        f"<div class='kicker' style='margin-top:28px'>Case · {escape(case['source'])} · expires {escape(str(case['expires_at'])[:16])} UTC</div>"
+        f"<h1 style='font-size:clamp(34px,5vw,58px)'>{escape(case['name'])}</h1>{line}"
+        f"<h2>Analyst queue <span class='count'>{len(analyst_queue)}</span></h2>{_docket(analyst_queue, 0)}"
+        f"<h2>Suggested closes <span class='count'>{len(suggestions)}</span></h2>{_docket(suggestions, len(analyst_queue))}")
+    return _page(f"{case['name']} · Probative AI case", body, refresh=5 if working else None)
