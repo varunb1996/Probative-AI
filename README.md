@@ -11,6 +11,12 @@ logs -> Sigma (Hayabusa) -> parse -> noise filter -> process-scoped context -> e
 
 Design: [`docs/design.md`](docs/design.md). Build log and gates: [`docs/build-prompts.md`](docs/build-prompts.md).
 
+![The alert docket](docs/screenshots/1-docket.png)
+
+| An exhibit: verdict, testimony, the seven checks | The sandbox: open a case on a recorded attack or your own log |
+| --- | --- |
+| ![Exhibit](docs/screenshots/2-exhibit-attack.png) | ![Sandbox](docs/screenshots/3-sandbox-try.png) |
+
 ## Results so far
 
 OTRF `empire_mimikatz_logonpasswords` (public), 35 labelled alerts, shadow mode
