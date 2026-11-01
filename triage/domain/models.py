@@ -154,13 +154,15 @@ class RuleMode(StrEnum):
 
 
 class QueryRecord(BaseModel):
-    """One read-only investigator tool call and the event IDs it returned."""
+    """One read-only investigator step: the tool call, what it added, or why it was rejected."""
 
     model_config = ConfigDict(frozen=True)
 
     tool: str
     arguments: dict[str, Any]
-    result_event_ids: list[str]
+    result_event_ids: list[str]          # events this step added to the evidence
+    intel: list[str] = []                # "kind:indicator" for intel hits this step added
+    error: str | None = None             # set when the call was malformed or rejected
 
 
 class LoopState(BaseModel):
@@ -171,3 +173,15 @@ class LoopState(BaseModel):
     step_count: int = 0
     tokens_used: int = 0
     query_log: list[QueryRecord] = []
+
+
+class Investigation(BaseModel):
+    """Outcome of the bounded investigator: a verified verdict, or a hand-off to a human with its log."""
+
+    model_config = ConfigDict(frozen=True)
+
+    alert_id: str
+    verified: bool
+    stop_reason: str
+    result: JudgeResult | None = None    # the investigator's final verdict, if it reached one
+    state: LoopState
