@@ -63,7 +63,7 @@ def test_demo_alerts_are_never_budget_gated(conn):
 
 def test_daily_cap_pauses_the_llm(conn, case):
     for i in range(sandbox.DAILY_LLM_CAP):
-        repo.audit(conn, f"x{i}", "judge", {"tokens_used": 100})
+        repo.audit(conn, f"x{i}", "judge", {"tokens_used": 100}, case_id="earlier-case")
     assert "paused" in sandbox.budget_gate(conn, case)
 
 
@@ -133,3 +133,9 @@ def test_a_case_that_crashed_once_is_failed_not_retried(conn, tmp_path):
     c = repo.get_case(conn, case_id)
     assert c["status"] == "failed" and "too large" in c["detail"]
     assert not path.exists()
+
+
+def test_demo_replays_do_not_use_up_the_sandbox_budget(conn, case):
+    for i in range(sandbox.DAILY_LLM_CAP + 5):
+        repo.audit(conn, f"seed{i}", "judge", {"tokens_used": 5000})       # the demo seed, no case
+    assert sandbox.budget_gate(conn, case) is None

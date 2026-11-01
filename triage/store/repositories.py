@@ -124,9 +124,10 @@ def audit(conn: psycopg.Connection, alert_id: str | None, kind: str, payload: di
 
 
 def llm_calls_today(conn: psycopg.Connection) -> int:
-    """Judge calls that reached a model since UTC midnight (replays and skips spend no tokens)."""
+    """Sandbox judge calls that reached a model since UTC midnight. Rows without a case (the demo seed
+    and gate replays) carry recorded token counts but called no model, so they never count."""
     return conn.execute(
-        "select count(*) as n from audit_log where kind = 'judge' "
+        "select count(*) as n from audit_log where kind = 'judge' and case_id is not null "
         "and at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc' "
         "and coalesce((payload->>'tokens_used')::int, 0) > 0").fetchone()["n"]
 

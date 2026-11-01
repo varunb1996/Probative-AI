@@ -121,10 +121,13 @@ def test_llm_budget_is_taken_atomically_per_case(conn):
     assert repo.get_case(conn, "c1")["llm_used"] == 2
 
 
-def test_llm_calls_today_counts_real_judge_calls(conn):
-    repo.audit(conn, "a1", "judge", {"tokens_used": 120})
-    repo.audit(conn, "a2", "judge", {"tokens_used": 0})        # replayed or skipped: no model call
-    repo.audit(conn, "a3", "verify", {"tokens_used": 50})
+def test_llm_calls_today_counts_only_real_sandbox_calls(conn):
+    # Changed 2026-11-01: replays of recorded results (the demo seed, the gate) carry their original
+    # token counts but call no model; the cap shares the free allowance among sandbox cases only.
+    repo.audit(conn, "a1", "judge", {"tokens_used": 120}, case_id="c1")
+    repo.audit(conn, "a2", "judge", {"tokens_used": 0}, case_id="c1")       # skipped: no model call
+    repo.audit(conn, "a3", "verify", {"tokens_used": 50}, case_id="c1")
+    repo.audit(conn, "a4", "judge", {"tokens_used": 900})                    # demo replay, no case
     assert repo.llm_calls_today(conn) == 1
 
 
